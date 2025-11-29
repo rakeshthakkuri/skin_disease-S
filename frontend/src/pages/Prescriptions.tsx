@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FileText, Globe, Pill, AlertTriangle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
 import { prescriptionApi } from '@/lib/api'

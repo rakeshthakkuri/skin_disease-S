@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import { 
   Camera, 
   Brain, 
-  FileText, 
   Bell, 
   Globe,
   ArrowRight,

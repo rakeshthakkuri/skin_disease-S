@@ -163,4 +163,4 @@ site/
 !model/.gitkeep
 !backend/uploads/.gitkeep
 !uploads/.gitkeep
-
+frontend/RENDER_DEPLOYMENT.md
