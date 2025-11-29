@@ -30,6 +30,7 @@ data/
 *.pickle
 
 # Model Files (large ML models)
+model/
 model/*.keras
 model/*.h5
 model/*.pth
@@ -39,6 +40,9 @@ model/*.pb
 model/checkpoints/
 model/weights/
 *.weights
+
+# Documentation (large files)
+Docs/
 
 # Node.js / Frontend
 frontend/node_modules/
