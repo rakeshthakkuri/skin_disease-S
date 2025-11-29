@@ -1,0 +1,38 @@
+# AcneAI Backend - Minimal Requirements
+
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# ML & Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+pillow==10.2.0
+numpy>=1.24.0
+
+# Required: For Keras model support (vit_model.keras)
+tensorflow>=2.13.0
+
+# Utilities
+pydantic==2.5.3
+aiofiles==23.2.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+bcrypt==4.0.1
+python-multipart==0.0.6
+email-validator==2.1.0
+
+# Database
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+alembic==1.13.1
+python-dotenv==1.0.0
+
+# Production Server
+gunicorn==21.2.0
+uvicorn[standard]==0.27.0
+
+# Monitoring & Logging
+python-json-logger==2.0.7
