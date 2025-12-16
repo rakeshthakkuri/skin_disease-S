@@ -67,22 +67,26 @@ export async function getUserById(userId: string): Promise<User | null> {
 
 /**
  * Authenticate a user with email and password
+ * Returns user if successful, or error code if failed
  */
 export async function authenticateUser(
   email: string,
   password: string
-): Promise<User | null> {
+): Promise<{ user: User } | { error: 'user_not_found' | 'wrong_password' }> {
   const user = await getUserByEmail(email);
   if (!user) {
-    return null;
+    console.log(`❌ Login failed: User not found for email: ${email}`);
+    return { error: 'user_not_found' };
   }
 
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
-    return null;
+    console.log(`❌ Login failed: Invalid password for email: ${email}`);
+    return { error: 'wrong_password' };
   }
 
-  return user;
+  console.log(`✅ Login successful for email: ${email}`);
+  return { user };
 }
 
 /**

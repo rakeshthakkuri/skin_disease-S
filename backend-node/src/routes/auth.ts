@@ -85,13 +85,26 @@ router.post(
 
       const { email, password } = req.body;
 
-      const user = await authenticateUser(email, password);
-      if (!user) {
-        return res.status(401).json({
-          detail: 'Incorrect email or password',
-        });
+      console.log(`🔐 Login attempt for email: ${email}`);
+      const result = await authenticateUser(email, password);
+      
+      if ('error' in result) {
+        if (result.error === 'user_not_found') {
+          return res.status(401).json({
+            detail: 'User not found',
+            error_code: 'user_not_found',
+            message: 'No account exists with this email address. Please check your email or register a new account.',
+          });
+        } else if (result.error === 'wrong_password') {
+          return res.status(401).json({
+            detail: 'Incorrect password',
+            error_code: 'wrong_password',
+            message: 'The password you entered is incorrect. Please try again.',
+          });
+        }
       }
 
+      const user = result.user;
       // Create access token
       const accessToken = createAccessToken(user.id);
 
