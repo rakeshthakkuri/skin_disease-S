@@ -12,21 +12,15 @@ A minimal AI-powered application for acne diagnosis, prescription generation, an
 ## 📁 Project Structure
 
 ```
-Skin disease/
-├── backend/                # FastAPI Backend
-│   ├── app/
-│   │   ├── api/           # API Endpoints
-│   │   │   ├── diagnosis.py
-│   │   │   ├── prescription.py
-│   │   │   └── reminders.py
-│   │   ├── ml/            # ML Models
-│   │   │   ├── acne_classifier.py
-│   │   │   ├── multimodal_fusion.py
-│   │   │   ├── nlp_prescriber.py
-│   │   │   └── translator.py
-│   │   └── main.py
-│   ├── requirements.txt
-│   └── run.py
+Acne detection/
+├── backend-node/          # Node.js/Express Backend
+│   ├── src/
+│   │   ├── routes/       # API Routes
+│   │   ├── services/     # Business Logic
+│   │   ├── models/       # Database Models
+│   │   └── app.ts        # Express App
+│   ├── scripts/           # Utility Scripts
+│   └── package.json
 │
 ├── frontend/              # React Frontend
 │   ├── src/
@@ -46,20 +40,24 @@ Skin disease/
 
 ## 🚀 Getting Started
 
-### Backend
+### Backend (Node.js/Express)
 
 ```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+cd backend-node
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
+
+# Set up environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Set up database
+npm run setup:db
+npm run reset:db  # Creates tables (development only)
 
 # Run server
-python run.py
+npm run dev
 ```
 
 API runs at `http://localhost:8000`

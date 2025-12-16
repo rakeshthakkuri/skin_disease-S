@@ -101,10 +101,9 @@ log/
 *.sql
 
 # Uploads (user-uploaded files)
-backend/uploads/*
-!backend/uploads/.gitkeep
 uploads/
 media/
+backend-node/uploads/
 
 # Temporary files
 tmp/
@@ -161,6 +160,12 @@ site/
 
 # Keep important directories but ignore contents
 !model/.gitkeep
-!backend/uploads/.gitkeep
 !uploads/.gitkeep
 frontend/RENDER_DEPLOYMENT.md
+severity dataset/
+acne detection dataset/
+acne_efficientnet_b0_best.pth
+acne_mobilenet_v2_best.pth
+acne_resnet18_best.pth
+deleted:    backend/DEPLOYMENT.md
+deleted:    backend/PRODUCTION_READY.md
