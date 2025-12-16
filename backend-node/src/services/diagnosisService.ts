@@ -62,7 +62,7 @@ export async function listDiagnoses(userId: string): Promise<Diagnosis[]> {
 export function generateClinicalNotes(
   severity: string,
   lesionCounts: Record<string, number>,
-  metadata: Record<string, any>
+  metadata: Record<string, any> = {}
 ): string {
   const notes: string[] = [];
   const total = Object.values(lesionCounts).reduce((sum, count) => sum + count, 0);
@@ -100,8 +100,8 @@ export function generateClinicalNotes(
     }
   }
 
-  // Add duration note if chronic
-  if (metadata.acne_duration_months > 12) {
+  // Add duration note if chronic (only if metadata provided)
+  if (metadata && metadata.acne_duration_months && metadata.acne_duration_months > 12) {
     notes.push('Chronic acne (>12 months) - consider comprehensive treatment plan.');
   }
 

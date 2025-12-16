@@ -24,35 +24,73 @@ router.post(
   '/analyze',
   authenticate,
   upload.single('image'),
-  [
-    body('clinical_metadata').isJSON().withMessage('clinical_metadata must be valid JSON'),
-  ],
   async (req: Request, res: Response) => {
     try {
       // Validate file
       validateImageFile(req.file);
 
-      // Parse metadata
-      let metadata: Record<string, any>;
-      try {
-        metadata = JSON.parse(req.body.clinical_metadata);
-      } catch (error) {
-        return res.status(400).json({ detail: 'Invalid clinical metadata JSON' });
+      // Parse metadata (optional - defaults to empty object)
+      let metadata: Record<string, any> = {};
+      if (req.body.clinical_metadata) {
+        try {
+          metadata = JSON.parse(req.body.clinical_metadata);
+        } catch (error) {
+          // If metadata is invalid, just use empty object
+          metadata = {};
+        }
       }
 
       const user = req.user!;
       const file = req.file!;
 
+      console.log(`🔍 Starting diagnosis for user ${user.id}, file: ${file.filename}`);
+
       // Run ML inference
-      const classification = await classify(file.path);
-      if (!classification) {
-        return res.status(500).json({ detail: 'ML inference failed' });
+      let classification;
+      try {
+        classification = await classify(file.path);
+        if (!classification) {
+          console.error('❌ ML inference returned null - models may not be loaded');
+          return res.status(500).json({ 
+            detail: 'ML models not available. Please convert PyTorch models to ONNX format.',
+            error: 'models_not_loaded',
+            hint: 'Run: python backend-node/scripts/convert-models-to-onnx.py'
+          });
+        }
+        console.log(`✅ Classification successful: hasAcne=${classification.hasAcne}, severity=${classification.severity}`);
+      } catch (error: any) {
+        console.error('❌ ML inference error:', error);
+        console.error('Error stack:', error.stack);
+        
+        // Check if it's a model loading issue
+        if (error.message?.includes('session not loaded') || error.message?.includes('model')) {
+          return res.status(500).json({ 
+            detail: 'ML models not available. Please convert PyTorch models to ONNX format.',
+            error: 'models_not_loaded',
+            hint: 'Run: python backend-node/scripts/convert-models-to-onnx.py'
+          });
+        }
+        
+        return res.status(500).json({ 
+          detail: 'ML inference failed', 
+          error: error.message || 'Unknown error' 
+        });
       }
 
       // Acne type classification (only if acne detected)
       let typeResult: { type: string; confidence: number; allScores: Record<string, number> } | null = null;
       if (classification.hasAcne) {
-        typeResult = await predictType(file.path);
+        try {
+          typeResult = await predictType(file.path);
+          if (typeResult) {
+            console.log(`✅ Type classification successful: ${typeResult.type} (${(typeResult.confidence * 100).toFixed(1)}%)`);
+          } else {
+            console.warn('⚠️ Type classification returned null');
+          }
+        } catch (error: any) {
+          console.error('❌ Type classification error:', error);
+          // Continue without type result if it fails
+        }
       }
 
       // Detect lesions
