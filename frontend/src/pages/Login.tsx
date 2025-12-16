@@ -12,10 +12,14 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setEmailError(null)
+    setPasswordError(null)
 
     try {
       const response = await authApi.login({ email, password })
@@ -23,7 +27,19 @@ export default function Login() {
       toast.success('Login successful!')
       navigate('/app')
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Login failed')
+      const errorData = error.response?.data
+      const errorCode = errorData?.error_code
+      const errorMessage = errorData?.message || errorData?.detail || 'Login failed'
+
+      if (errorCode === 'user_not_found') {
+        setEmailError(errorMessage)
+        toast.error('User not found')
+      } else if (errorCode === 'wrong_password') {
+        setPasswordError(errorMessage)
+        toast.error('Incorrect password')
+      } else {
+        toast.error(errorMessage)
+      }
     } finally {
       setLoading(false)
     }
@@ -46,11 +62,32 @@ export default function Login() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setEmailError(null)
+              }}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                emailError
+                  ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                  : 'border-gray-300'
+              }`}
               placeholder="your@email.com"
             />
+            {emailError && (
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <span>⚠️</span>
+                <span>{emailError}</span>
+              </p>
+            )}
+            {emailError && (
+              <p className="mt-1 text-xs text-gray-600">
+                Don't have an account?{' '}
+                <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium underline">
+                  Sign up here
+                </Link>
+              </p>
+            )}
           </div>
 
           <div>
@@ -61,11 +98,29 @@ export default function Login() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setPasswordError(null)
+              }}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                passwordError
+                  ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                  : 'border-gray-300'
+              }`}
               placeholder="••••••••"
             />
+            {passwordError && (
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <span>⚠️</span>
+                <span>{passwordError}</span>
+              </p>
+            )}
+            {passwordError && (
+              <p className="mt-1 text-xs text-gray-600">
+                Forgot your password? Please contact support or try again.
+              </p>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
