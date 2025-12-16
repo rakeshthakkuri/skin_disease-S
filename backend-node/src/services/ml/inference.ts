@@ -56,29 +56,65 @@ export async function initializeModels(): Promise<void> {
   ];
 
   // Load binary model
+  let binaryLoaded = false;
   for (const pattern of binaryPatterns) {
     const path = join(MODEL_DIR, pattern);
     if (existsSync(path)) {
       binarySession = await loadModel(path, 'Binary');
+      binaryLoaded = true;
       break;
     }
   }
+  if (!binaryLoaded) {
+    console.warn(`⚠️  No binary model found. Tried: ${binaryPatterns.join(', ')}`);
+    console.warn(`   Model directory: ${MODEL_DIR}`);
+  }
 
   // Load severity model
+  let severityLoaded = false;
   for (const pattern of severityPatterns) {
     const path = join(MODEL_DIR, pattern);
     if (existsSync(path)) {
       severitySession = await loadModel(path, 'Severity');
+      severityLoaded = true;
       break;
     }
+  }
+  if (!severityLoaded) {
+    console.warn(`⚠️  No severity model found. Tried: ${severityPatterns.join(', ')}`);
+    console.warn(`   Model directory: ${MODEL_DIR}`);
   }
 
   // Load type model
   if (existsSync(TYPE_MODEL_PATH)) {
     typeSession = await loadModel(TYPE_MODEL_PATH, 'Type');
+  } else {
+    console.warn(`⚠️  No type model found at: ${TYPE_MODEL_PATH}`);
   }
 
   console.log('✅ ML models initialization complete');
+  
+  // Log which models are loaded
+  console.log(`📊 Model Status:
+    - Binary: ${binarySession ? '✅ Loaded' : '❌ Not loaded'}
+    - Severity: ${severitySession ? '✅ Loaded' : '❌ Not loaded'}
+    - Type: ${typeSession ? '✅ Loaded' : '❌ Not loaded'}`);
+  
+  // Validate type model class order
+  if (typeSession) {
+    console.log(`\n📋 Type Classification Class Order:`);
+    TYPE_LABELS.forEach((label, idx) => {
+      console.log(`    Index ${idx}: ${label}`);
+    });
+    console.log(`\n✅ Expected class order: ${TYPE_LABELS.join(', ')}`);
+    console.log(`   This should match the checkpoint class_names from training.`);
+  }
+  
+  if (!binarySession || !severitySession) {
+    console.error('❌ CRITICAL: Required models (binary or severity) are not loaded!');
+    console.error('   Please convert PyTorch models to ONNX format using:');
+    console.error('   python backend-node/scripts/convert-models-to-onnx.py');
+  }
 }
 
 /**
@@ -93,11 +129,17 @@ async function runInference(
   }
 
   try {
-    const results = await session.run({ input: inputTensor });
-    const output = results.output;
+    // Get input/output names from the model
+    const inputName = session.inputNames[0];
+    const outputName = session.outputNames[0];
+    
+    const results = await session.run({ [inputName]: inputTensor });
+    const output = results[outputName];
     
     if (output && output.data) {
-      return output.data as Float32Array;
+      const data = output.data as Float32Array;
+      console.log(`🔍 Model output shape: [${output.dims.join(', ')}], length: ${data.length}`);
+      return data;
     }
     return null;
   } catch (error) {
@@ -130,10 +172,18 @@ export interface BinaryResult {
 
 export async function predictBinary(imagePath: string): Promise<BinaryResult | null> {
   if (!binarySession) {
+    console.error('❌ Binary model session not loaded');
     return null;
   }
 
-  const inputTensor = await preprocessImage(imagePath);
+  let inputTensor: Tensor;
+  try {
+    inputTensor = await preprocessImage(imagePath);
+  } catch (error: any) {
+    console.error('❌ Image preprocessing failed:', error);
+    throw new Error(`Image preprocessing failed: ${error.message}`);
+  }
+
   const logits = await runInference(binarySession, inputTensor);
 
   if (!logits || logits.length < 2) {
@@ -141,15 +191,49 @@ export async function predictBinary(imagePath: string): Promise<BinaryResult | n
   }
 
   const probs = softmax(logits);
-  const predictedClass = probs[0] < probs[1] ? 1 : 0;
-  const confidence = probs[predictedClass];
+  
+  // Debug: log raw outputs
+  console.log(`🔍 Binary classification raw logits: [${Array.from(logits).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Binary classification probabilities: [${Array.from(probs).map(x => x.toFixed(3)).join(', ')}]`);
+  
+  // Binary model output interpretation:
+  // Based on training: label 0 = no acne, label 1 = has acne
+  // Model outputs: [prob_no_acne, prob_has_acne]
+  // So: index 0 = no acne, index 1 = has acne
+  
+  // IMPORTANT: If results are consistently wrong, try setting this to true
+  // This will swap the interpretation: index 0 = has acne, index 1 = no acne
+  const REVERSE_BINARY_INTERPRETATION = false;
+  
+  let predictedClass: number;
+  let noAcneProb: number;
+  let hasAcneProb: number;
+  
+  if (REVERSE_BINARY_INTERPRETATION) {
+    // Reversed interpretation: index 0 = has acne, index 1 = no acne
+    predictedClass = probs[0] > probs[1] ? 1 : 0;
+    noAcneProb = probs[1];
+    hasAcneProb = probs[0];
+    console.log(`⚠️  Using REVERSED binary interpretation (index 0 = has acne)`);
+  } else {
+    // Normal interpretation: index 0 = no acne, index 1 = has acne
+    predictedClass = probs[1] > probs[0] ? 1 : 0;
+    noAcneProb = probs[0];
+    hasAcneProb = probs[1];
+  }
+  
+  // Confidence is the probability of the predicted class
+  const confidence = predictedClass === 1 ? hasAcneProb : noAcneProb;
+
+  console.log(`🔍 Binary prediction: class=${predictedClass} (${predictedClass === 1 ? 'hasAcne' : 'noAcne'}), confidence=${confidence.toFixed(3)}`);
+  console.log(`🔍 Binary probabilities: noAcne=${noAcneProb.toFixed(3)}, hasAcne=${hasAcneProb.toFixed(3)}`);
 
   return {
     hasAcne: predictedClass === 1,
     confidence,
     probabilities: {
-      noAcne: probs[0],
-      hasAcne: probs[1],
+      noAcne: noAcneProb,
+      hasAcne: hasAcneProb,
     },
   };
 }
@@ -168,10 +252,18 @@ const SEVERITY_LABELS = ['mild', 'moderate', 'severe', 'very_severe'];
 
 export async function predictSeverity(imagePath: string): Promise<SeverityResult | null> {
   if (!severitySession) {
+    console.error('❌ Severity model session not loaded');
     return null;
   }
 
-  const inputTensor = await preprocessImage(imagePath);
+  let inputTensor: Tensor;
+  try {
+    inputTensor = await preprocessImage(imagePath);
+  } catch (error: any) {
+    console.error('❌ Image preprocessing failed:', error);
+    throw new Error(`Image preprocessing failed: ${error.message}`);
+  }
+
   const logits = await runInference(severitySession, inputTensor);
 
   if (!logits || logits.length < 4) {
@@ -179,6 +271,12 @@ export async function predictSeverity(imagePath: string): Promise<SeverityResult
   }
 
   const probs = softmax(logits);
+  
+  // Debug: log raw outputs
+  console.log(`🔍 Severity classification raw logits: [${Array.from(logits).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Severity classification probabilities: [${Array.from(probs).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Severity label mapping: ${SEVERITY_LABELS.map((l, i) => `${i}=${l}`).join(', ')}`);
+  
   let maxIdx = 0;
   let maxProb = probs[0];
   for (let i = 1; i < probs.length; i++) {
@@ -192,6 +290,8 @@ export async function predictSeverity(imagePath: string): Promise<SeverityResult
   SEVERITY_LABELS.forEach((label, idx) => {
     allScores[label] = probs[idx];
   });
+
+  console.log(`🔍 Severity prediction: index=${maxIdx}, severity=${SEVERITY_LABELS[maxIdx]}, confidence=${maxProb.toFixed(3)}`);
 
   return {
     severity: SEVERITY_LABELS[maxIdx],
@@ -214,17 +314,32 @@ const TYPE_LABELS = ['Pustula', 'blackhead', 'cysts', 'nodules', 'papules', 'whi
 
 export async function predictType(imagePath: string): Promise<TypeResult | null> {
   if (!typeSession) {
+    console.error('❌ Type model session not loaded');
     return null;
   }
 
-  const inputTensor = await preprocessImage(imagePath);
+  let inputTensor: Tensor;
+  try {
+    inputTensor = await preprocessImage(imagePath);
+  } catch (error: any) {
+    console.error('❌ Image preprocessing failed:', error);
+    throw new Error(`Image preprocessing failed: ${error.message}`);
+  }
+
   const logits = await runInference(typeSession, inputTensor);
 
   if (!logits || logits.length < 6) {
+    console.error('❌ Type classification returned invalid logits');
     return null;
   }
 
   const probs = softmax(logits);
+  
+  // Debug: log raw outputs
+  console.log(`🔍 Type classification raw logits: [${Array.from(logits).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Type classification probabilities: [${Array.from(probs).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Type label mapping: ${TYPE_LABELS.map((l, i) => `${i}=${l}`).join(', ')}`);
+  
   let maxIdx = 0;
   let maxProb = probs[0];
   for (let i = 1; i < probs.length; i++) {
@@ -238,6 +353,9 @@ export async function predictType(imagePath: string): Promise<TypeResult | null>
   TYPE_LABELS.forEach((label, idx) => {
     allScores[label] = probs[idx];
   });
+
+  console.log(`🔍 Type prediction: index=${maxIdx}, type=${TYPE_LABELS[maxIdx]}, confidence=${maxProb.toFixed(3)}`);
+  console.log(`🔍 All type scores: ${Object.entries(allScores).map(([k, v]) => `${k}=${v.toFixed(3)}`).join(', ')}`);
 
   return {
     type: TYPE_LABELS[maxIdx],
@@ -260,9 +378,16 @@ export interface ClassificationResult {
 
 export async function classify(imagePath: string): Promise<ClassificationResult | null> {
   // Stage 1: Binary classification
-  const binaryResult = await predictBinary(imagePath);
-  if (!binaryResult) {
-    return null;
+  let binaryResult;
+  try {
+    binaryResult = await predictBinary(imagePath);
+    if (!binaryResult) {
+      console.error('❌ Binary classification returned null');
+      return null;
+    }
+  } catch (error: any) {
+    console.error('❌ Binary classification error:', error);
+    throw error;
   }
 
   // If no acne, return clear result
@@ -278,9 +403,16 @@ export async function classify(imagePath: string): Promise<ClassificationResult 
   }
 
   // Stage 2: Severity classification
-  const severityResult = await predictSeverity(imagePath);
-  if (!severityResult) {
-    return null;
+  let severityResult;
+  try {
+    severityResult = await predictSeverity(imagePath);
+    if (!severityResult) {
+      console.error('❌ Severity classification returned null');
+      return null;
+    }
+  } catch (error: any) {
+    console.error('❌ Severity classification error:', error);
+    throw error;
   }
 
   // Combine all scores
