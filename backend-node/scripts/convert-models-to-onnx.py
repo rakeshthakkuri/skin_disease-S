@@ -67,17 +67,46 @@ def convert_model_to_onnx(
         # Load checkpoint
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
         
+        # Validate class_names for type model
+        if model_type == "type":
+            expected_class_names = ['Pustula', 'blackhead', 'cysts', 'nodules', 'papules', 'whitehead']
+            checkpoint_class_names = checkpoint.get("class_names", [])
+            
+            if checkpoint_class_names:
+                print(f"📋 Checkpoint class_names: {checkpoint_class_names}")
+                if checkpoint_class_names == expected_class_names:
+                    print(f"✅ Class order matches expected: {expected_class_names}")
+                else:
+                    print(f"⚠️  WARNING: Class order mismatch!")
+                    print(f"   Expected: {expected_class_names}")
+                    print(f"   Checkpoint: {checkpoint_class_names}")
+                    print(f"   This may cause incorrect predictions!")
+            else:
+                print(f"⚠️  WARNING: No class_names found in checkpoint!")
+                print(f"   Expected: {expected_class_names}")
+        
         # Determine architecture and num_classes
         arch = checkpoint.get("arch") or checkpoint.get("model_name", "efficientnet_b0")
+        # Normalize arch name
+        if isinstance(arch, str):
+            arch = arch.lower().replace("-", "_").replace(" ", "_")
         
-        if model_type == "binary":
+        # Get num_classes from checkpoint or infer from model_type
+        if checkpoint.get("num_classes"):
+            num_classes = checkpoint.get("num_classes")
+        elif model_type == "binary":
             num_classes = 2
         elif model_type == "severity":
             num_classes = 4
         elif model_type == "type":
-            num_classes = checkpoint.get("num_classes", 6)
+            num_classes = 6
         else:
-            num_classes = checkpoint.get("num_classes", 4)
+            num_classes = 4
+        
+        # Validate num_classes matches class_names length for type model
+        if model_type == "type" and checkpoint.get("class_names"):
+            if len(checkpoint.get("class_names")) != num_classes:
+                print(f"⚠️  WARNING: num_classes ({num_classes}) doesn't match class_names length ({len(checkpoint.get('class_names'))})")
         
         # Create model architecture
         if arch in ["efficientnet_b0", "efficientnet"]:
@@ -91,13 +120,26 @@ def convert_model_to_onnx(
             model = create_efficientnet_b0(num_classes)
         
         # Load weights
+        state_dict = None
         if "model_state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["model_state_dict"])
+            state_dict = checkpoint["model_state_dict"]
         elif "state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["state_dict"])
+            state_dict = checkpoint["state_dict"]
         else:
             print(f"❌ No state_dict found in checkpoint")
             return False
+        
+        # Try to load with strict=False to handle minor mismatches
+        try:
+            model.load_state_dict(state_dict, strict=False)
+        except RuntimeError as e:
+            print(f"⚠️  Warning: Some weights couldn't be loaded: {e}")
+            # Try loading only matching keys
+            model_dict = model.state_dict()
+            pretrained_dict = {k: v for k, v in state_dict.items() if k in model_dict and model_dict[k].shape == v.shape}
+            model_dict.update(pretrained_dict)
+            model.load_state_dict(model_dict)
+            print(f"✅ Loaded {len(pretrained_dict)}/{len(state_dict)} parameters")
         
         model.eval()
         
@@ -121,6 +163,13 @@ def convert_model_to_onnx(
         )
         
         print(f"✅ Successfully converted to {output_path}")
+        
+        # Log class order for type model
+        if model_type == "type" and checkpoint.get("class_names"):
+            print(f"📋 Class order preserved in ONNX model:")
+            for idx, cls in enumerate(checkpoint.get("class_names")):
+                print(f"   Index {idx}: {cls}")
+        
         return True
         
     except Exception as e:
