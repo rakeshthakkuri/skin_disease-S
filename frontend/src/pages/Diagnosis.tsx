@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
+import { cn, getSeverityColor, getSeverityLabel, getAcneTypeLabel, getAcneTypeColor } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
 import { diagnosisApi, prescriptionApi } from '@/lib/api'
 
@@ -16,6 +16,9 @@ interface DiagnosisResult {
   severity: string
   confidence: number
   severity_scores: Record<string, number>
+  acne_type?: string
+  acne_type_confidence?: number
+  acne_type_scores?: Record<string, number>
   lesion_counts: Record<string, number>
   clinical_notes: string
   recommended_urgency: string
@@ -31,10 +34,15 @@ export default function Diagnosis() {
   
   const [metadata, setMetadata] = useState({
     age: '',
+    sex: 'other',
+    fitzpatrick_skin_type: 'III',
     skin_type: 'normal',
     acne_duration_months: '',
     previous_treatments: '',
+    comorbidities: '',
     allergies: '',
+    lifestyle_stress: 'moderate',
+    lifestyle_diet: '',
   })
   
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -64,10 +72,17 @@ export default function Diagnosis() {
       formData.append('image', image)
       formData.append('clinical_metadata', JSON.stringify({
         age: parseInt(metadata.age) || 25,
+        sex: metadata.sex,
+        fitzpatrick_skin_type: metadata.fitzpatrick_skin_type,
         skin_type: metadata.skin_type,
         acne_duration_months: parseInt(metadata.acne_duration_months) || 6,
         previous_treatments: metadata.previous_treatments ? metadata.previous_treatments.split(',').map(s => s.trim()) : [],
+        comorbidities: metadata.comorbidities ? metadata.comorbidities.split(',').map(s => s.trim()) : [],
         allergies: metadata.allergies ? metadata.allergies.split(',').map(s => s.trim()) : [],
+        lifestyle_factors: {
+          stress_level: metadata.lifestyle_stress,
+          diet: metadata.lifestyle_diet,
+        },
       }))
       
       const response = await diagnosisApi.analyze(formData)
@@ -102,7 +117,18 @@ export default function Diagnosis() {
     setImage(null)
     setImagePreview(null)
     setResult(null)
-    setMetadata({ age: '', skin_type: 'normal', acne_duration_months: '', previous_treatments: '', allergies: '' })
+    setMetadata({ 
+      age: '', 
+      sex: 'other',
+      fitzpatrick_skin_type: 'III',
+      skin_type: 'normal', 
+      acne_duration_months: '', 
+      previous_treatments: '', 
+      comorbidities: '',
+      allergies: '',
+      lifestyle_stress: 'moderate',
+      lifestyle_diet: '',
+    })
   }
   
   return (
@@ -173,10 +199,34 @@ export default function Diagnosis() {
                   </div>
                   
                   <form onSubmit={handleSubmit} className="flex-1 space-y-4">
+                    {/* Demographics */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
-                        <input type="number" value={metadata.age} onChange={(e) => setMetadata({ ...metadata, age: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Age *</label>
+                        <input type="number" min="10" max="100" value={metadata.age} onChange={(e) => setMetadata({ ...metadata, age: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Sex *</label>
+                        <select value={metadata.sex} onChange={(e) => setMetadata({ ...metadata, sex: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    {/* Skin Characteristics */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fitzpatrick Skin Type *</label>
+                        <select value={metadata.fitzpatrick_skin_type} onChange={(e) => setMetadata({ ...metadata, fitzpatrick_skin_type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required>
+                          <option value="I">Type I - Very fair, always burns</option>
+                          <option value="II">Type II - Fair, usually burns</option>
+                          <option value="III">Type III - Medium, sometimes burns</option>
+                          <option value="IV">Type IV - Olive, rarely burns</option>
+                          <option value="V">Type V - Brown, very rarely burns</option>
+                          <option value="VI">Type VI - Dark brown/black, never burns</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Skin Type</label>
@@ -189,18 +239,50 @@ export default function Diagnosis() {
                         </select>
                       </div>
                     </div>
+                    
+                    {/* Acne History */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Acne Duration (months)</label>
-                      <input type="number" value={metadata.acne_duration_months} onChange={(e) => setMetadata({ ...metadata, acne_duration_months: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Acne Duration (months) *</label>
+                      <input type="number" min="0" max="120" value={metadata.acne_duration_months} onChange={(e) => setMetadata({ ...metadata, acne_duration_months: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
                     </div>
+                    
+                    {/* Medical History */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Previous Treatments (comma-separated)</label>
-                      <input type="text" value={metadata.previous_treatments} onChange={(e) => setMetadata({ ...metadata, previous_treatments: e.target.value })} placeholder="e.g., benzoyl peroxide, salicylic acid" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+                      <input type="text" value={metadata.previous_treatments} onChange={(e) => setMetadata({ ...metadata, previous_treatments: e.target.value })} placeholder="e.g., isotretinoin 6 months ago, benzoyl peroxide" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+                      <p className="text-xs text-gray-500 mt-1">Include treatment name and timeframe if known</p>
                     </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Comorbidities (comma-separated)</label>
+                      <input type="text" value={metadata.comorbidities} onChange={(e) => setMetadata({ ...metadata, comorbidities: e.target.value })} placeholder="e.g., pregnancy, PCOS, diabetes" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+                      <p className="text-xs text-gray-500 mt-1">Important: Include pregnancy status if applicable</p>
+                    </div>
+                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Allergies (comma-separated)</label>
-                      <input type="text" value={metadata.allergies} onChange={(e) => setMetadata({ ...metadata, allergies: e.target.value })} placeholder="e.g., penicillin" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+                      <input type="text" value={metadata.allergies} onChange={(e) => setMetadata({ ...metadata, allergies: e.target.value })} placeholder="e.g., penicillin, sulfa drugs" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
                     </div>
+                    
+                    {/* Lifestyle Factors (Optional) */}
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Lifestyle Factors (Optional)</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Stress Level</label>
+                          <select value={metadata.lifestyle_stress} onChange={(e) => setMetadata({ ...metadata, lifestyle_stress: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                            <option value="low">Low</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="high">High</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Diet Notes</label>
+                          <input type="text" value={metadata.lifestyle_diet} onChange={(e) => setMetadata({ ...metadata, lifestyle_diet: e.target.value })} placeholder="e.g., high dairy, high sugar" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+                        </div>
+                      </div>
+                    </div>
+                    
                     <Button type="submit" className="w-full">Analyze Image</Button>
                   </form>
                 </div>
@@ -236,13 +318,76 @@ export default function Diagnosis() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Confidence</span>
-                    <span className="text-sm font-bold text-primary-600">{(result.confidence * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-500 rounded-full" style={{ width: `${result.confidence * 100}%` }} />
+                {/* Type and Severity Side-by-Side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Acne Type Card */}
+                  {result.acne_type && (
+                    <div className="p-4 border border-gray-200 rounded-xl bg-white">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-700">Acne Type</h4>
+                        <span className={cn('px-3 py-1 rounded-full text-xs font-medium', getAcneTypeColor(result.acne_type))}>
+                          {getAcneTypeLabel(result.acne_type)}
+                        </span>
+                      </div>
+                      {result.acne_type_confidence !== undefined && (
+                        <>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-gray-600">Confidence</span>
+                            <span className="text-xs font-bold text-primary-600">{(result.acne_type_confidence * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                            <div className="h-full bg-primary-500 rounded-full" style={{ width: `${result.acne_type_confidence * 100}%` }} />
+                          </div>
+                        </>
+                      )}
+                      {result.acne_type_scores && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-gray-600 mb-2">All Types:</p>
+                          <div className="space-y-1">
+                            {Object.entries(result.acne_type_scores)
+                              .sort(([, a], [, b]) => b - a)
+                              .map(([type, score]) => (
+                                <div key={type} className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">{getAcneTypeLabel(type)}</span>
+                                  <span className="font-medium text-gray-900">{(score * 100).toFixed(1)}%</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Severity Card */}
+                  <div className="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-700">Severity</h4>
+                      <span className={cn('px-3 py-1 rounded-full text-xs font-medium', getSeverityColor(result.severity))}>
+                        {getSeverityLabel(result.severity)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-600">Confidence</span>
+                      <span className="text-xs font-bold text-primary-600">{(result.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                      <div className="h-full bg-primary-500 rounded-full" style={{ width: `${result.confidence * 100}%` }} />
+                    </div>
+                    {result.severity_scores && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-gray-600 mb-2">All Severities:</p>
+                        <div className="space-y-1">
+                          {Object.entries(result.severity_scores)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([severity, score]) => (
+                              <div key={severity} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{getSeverityLabel(severity)}</span>
+                                <span className="font-medium text-gray-900">{(score * 100).toFixed(1)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
