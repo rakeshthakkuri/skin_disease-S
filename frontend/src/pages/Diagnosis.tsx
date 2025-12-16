@@ -9,7 +9,7 @@ import { cn, getSeverityColor, getSeverityLabel, getAcneTypeLabel, getAcneTypeCo
 import { toast } from '@/components/ui/Toaster'
 import { diagnosisApi, prescriptionApi } from '@/lib/api'
 
-type Step = 'upload' | 'metadata' | 'analyzing' | 'results'
+type Step = 'upload' | 'analyzing' | 'results'
 
 interface DiagnosisResult {
   id: string
@@ -32,27 +32,49 @@ export default function Diagnosis() {
   const [result, setResult] = useState<DiagnosisResult | null>(null)
   const [isGeneratingPrescription, setIsGeneratingPrescription] = useState(false)
   
-  const [metadata, setMetadata] = useState({
-    age: '',
-    sex: 'other',
-    fitzpatrick_skin_type: 'III',
-    skin_type: 'normal',
-    acne_duration_months: '',
-    previous_treatments: '',
-    comorbidities: '',
-    allergies: '',
-    lifestyle_stress: 'moderate',
-    lifestyle_diet: '',
-  })
+  const handleAnalyze = useCallback(async (file: File) => {
+    setStep('analyzing')
+    
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      // Send empty metadata object
+      formData.append('clinical_metadata', JSON.stringify({}))
+      
+      const response = await diagnosisApi.analyze(formData)
+      setResult(response.data)
+      setStep('results')
+      toast.success('Diagnosis completed!')
+    } catch (error: any) {
+      console.error('Diagnosis error:', error)
+      
+      // Check for specific error types
+      const errorData = error.response?.data
+      const errorCode = errorData?.error
+      const errorDetail = errorData?.detail || 'Failed to analyze image'
+      
+      if (errorCode === 'models_not_loaded') {
+        toast.error('ML models are not available. Please contact administrator.')
+        console.error('Models not loaded. Hint:', errorData?.hint)
+      } else if (error.response?.status === 500) {
+        toast.error('Server error: ' + errorDetail)
+      } else {
+        toast.error(errorDetail || 'Failed to analyze image. Please try again.')
+      }
+      
+      setStep('upload')
+    }
+  }, [])
   
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
     if (file) {
       setImage(file)
       setImagePreview(URL.createObjectURL(file))
-      setStep('metadata')
+      // Automatically start analysis
+      handleAnalyze(file)
     }
-  }, [])
+  }, [handleAnalyze])
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -61,40 +83,6 @@ export default function Diagnosis() {
     maxSize: 10 * 1024 * 1024,
   })
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!image) return
-    
-    setStep('analyzing')
-    
-    try {
-      const formData = new FormData()
-      formData.append('image', image)
-      formData.append('clinical_metadata', JSON.stringify({
-        age: parseInt(metadata.age) || 25,
-        sex: metadata.sex,
-        fitzpatrick_skin_type: metadata.fitzpatrick_skin_type,
-        skin_type: metadata.skin_type,
-        acne_duration_months: parseInt(metadata.acne_duration_months) || 6,
-        previous_treatments: metadata.previous_treatments ? metadata.previous_treatments.split(',').map(s => s.trim()) : [],
-        comorbidities: metadata.comorbidities ? metadata.comorbidities.split(',').map(s => s.trim()) : [],
-        allergies: metadata.allergies ? metadata.allergies.split(',').map(s => s.trim()) : [],
-        lifestyle_factors: {
-          stress_level: metadata.lifestyle_stress,
-          diet: metadata.lifestyle_diet,
-        },
-      }))
-      
-      const response = await diagnosisApi.analyze(formData)
-      setResult(response.data)
-      setStep('results')
-      toast.success('Diagnosis completed!')
-    } catch (error) {
-      console.error('Diagnosis error:', error)
-      toast.error('Failed to analyze image. Please try again.')
-      setStep('metadata')
-    }
-  }
   
   const handleGeneratePrescription = async () => {
     if (!result) return
@@ -117,18 +105,6 @@ export default function Diagnosis() {
     setImage(null)
     setImagePreview(null)
     setResult(null)
-    setMetadata({ 
-      age: '', 
-      sex: 'other',
-      fitzpatrick_skin_type: 'III',
-      skin_type: 'normal', 
-      acne_duration_months: '', 
-      previous_treatments: '', 
-      comorbidities: '',
-      allergies: '',
-      lifestyle_stress: 'moderate',
-      lifestyle_diet: '',
-    })
   }
   
   return (
@@ -140,16 +116,16 @@ export default function Diagnosis() {
       
       {/* Progress */}
       <div className="flex items-center justify-center gap-2 mb-8">
-        {(['upload', 'metadata', 'analyzing', 'results'] as Step[]).map((s, i) => (
+        {(['upload', 'analyzing', 'results'] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center">
             <div className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
               step === s ? 'bg-primary-500 text-white' :
-              ['upload', 'metadata', 'analyzing', 'results'].indexOf(step) > i ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+              ['upload', 'analyzing', 'results'].indexOf(step) > i ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
             )}>
-              {['upload', 'metadata', 'analyzing', 'results'].indexOf(step) > i ? <CheckCircle className="w-5 h-5" /> : i + 1}
+              {['upload', 'analyzing', 'results'].indexOf(step) > i ? <CheckCircle className="w-5 h-5" /> : i + 1}
             </div>
-            {i < 3 && <div className={cn('w-12 h-1 mx-1', ['upload', 'metadata', 'analyzing', 'results'].indexOf(step) > i ? 'bg-green-500' : 'bg-gray-200')} />}
+            {i < 2 && <div className={cn('w-12 h-1 mx-1', ['upload', 'analyzing', 'results'].indexOf(step) > i ? 'bg-green-500' : 'bg-gray-200')} />}
           </div>
         ))}
       </div>
@@ -174,117 +150,7 @@ export default function Diagnosis() {
                     {isDragActive ? 'Drop your image here' : 'Upload Skin Image'}
                   </p>
                   <p className="text-sm text-gray-500">Drag and drop or click to select (max 10MB)</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-        
-        {step === 'metadata' && (
-          <motion.div key="metadata" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-            <Card variant="glass">
-              <CardHeader>
-                <CardTitle>Clinical Information</CardTitle>
-                <CardDescription>Provide details for more accurate analysis</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="md:w-1/3">
-                    <div className="relative rounded-xl overflow-hidden">
-                      {imagePreview && <img src={imagePreview} alt="Uploaded" className="w-full aspect-square object-cover" />}
-                      <button onClick={reset} className="absolute top-2 right-2 p-1 bg-black/50 rounded-full text-white hover:bg-black/70">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <form onSubmit={handleSubmit} className="flex-1 space-y-4">
-                    {/* Demographics */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Age *</label>
-                        <input type="number" min="10" max="100" value={metadata.age} onChange={(e) => setMetadata({ ...metadata, age: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Sex *</label>
-                        <select value={metadata.sex} onChange={(e) => setMetadata({ ...metadata, sex: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {/* Skin Characteristics */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Fitzpatrick Skin Type *</label>
-                        <select value={metadata.fitzpatrick_skin_type} onChange={(e) => setMetadata({ ...metadata, fitzpatrick_skin_type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required>
-                          <option value="I">Type I - Very fair, always burns</option>
-                          <option value="II">Type II - Fair, usually burns</option>
-                          <option value="III">Type III - Medium, sometimes burns</option>
-                          <option value="IV">Type IV - Olive, rarely burns</option>
-                          <option value="V">Type V - Brown, very rarely burns</option>
-                          <option value="VI">Type VI - Dark brown/black, never burns</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Skin Type</label>
-                        <select value={metadata.skin_type} onChange={(e) => setMetadata({ ...metadata, skin_type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
-                          <option value="oily">Oily</option>
-                          <option value="dry">Dry</option>
-                          <option value="combination">Combination</option>
-                          <option value="normal">Normal</option>
-                          <option value="sensitive">Sensitive</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {/* Acne History */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Acne Duration (months) *</label>
-                      <input type="number" min="0" max="120" value={metadata.acne_duration_months} onChange={(e) => setMetadata({ ...metadata, acne_duration_months: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" required />
-                    </div>
-                    
-                    {/* Medical History */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Previous Treatments (comma-separated)</label>
-                      <input type="text" value={metadata.previous_treatments} onChange={(e) => setMetadata({ ...metadata, previous_treatments: e.target.value })} placeholder="e.g., isotretinoin 6 months ago, benzoyl peroxide" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-                      <p className="text-xs text-gray-500 mt-1">Include treatment name and timeframe if known</p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Comorbidities (comma-separated)</label>
-                      <input type="text" value={metadata.comorbidities} onChange={(e) => setMetadata({ ...metadata, comorbidities: e.target.value })} placeholder="e.g., pregnancy, PCOS, diabetes" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-                      <p className="text-xs text-gray-500 mt-1">Important: Include pregnancy status if applicable</p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Allergies (comma-separated)</label>
-                      <input type="text" value={metadata.allergies} onChange={(e) => setMetadata({ ...metadata, allergies: e.target.value })} placeholder="e.g., penicillin, sulfa drugs" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-                    </div>
-                    
-                    {/* Lifestyle Factors (Optional) */}
-                    <div className="border-t pt-4">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Lifestyle Factors (Optional)</h4>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Stress Level</label>
-                          <select value={metadata.lifestyle_stress} onChange={(e) => setMetadata({ ...metadata, lifestyle_stress: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
-                            <option value="low">Low</option>
-                            <option value="moderate">Moderate</option>
-                            <option value="high">High</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Diet Notes</label>
-                          <input type="text" value={metadata.lifestyle_diet} onChange={(e) => setMetadata({ ...metadata, lifestyle_diet: e.target.value })} placeholder="e.g., high dairy, high sugar" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Button type="submit" className="w-full">Analyze Image</Button>
-                  </form>
+                  <p className="text-xs text-gray-400 mt-2">Image will be analyzed automatically</p>
                 </div>
               </CardContent>
             </Card>
