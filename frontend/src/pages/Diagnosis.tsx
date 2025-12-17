@@ -2,10 +2,10 @@ import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, X, Loader2, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { cn, getSeverityColor, getSeverityLabel, getAcneTypeLabel, getAcneTypeColor } from '@/lib/utils'
+import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
 import { diagnosisApi, prescriptionApi } from '@/lib/api'
 
@@ -13,12 +13,11 @@ type Step = 'upload' | 'analyzing' | 'results'
 
 interface DiagnosisResult {
   id: string
+  has_acne: boolean
+  binary_confidence: number
   severity: string
   confidence: number
   severity_scores: Record<string, number>
-  acne_type?: string
-  acne_type_confidence?: number
-  acne_type_scores?: Record<string, number>
   lesion_counts: Record<string, number>
   clinical_notes: string
   recommended_urgency: string
@@ -31,6 +30,8 @@ export default function Diagnosis() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [result, setResult] = useState<DiagnosisResult | null>(null)
   const [isGeneratingPrescription, setIsGeneratingPrescription] = useState(false)
+  const [prescriptionStatus, setPrescriptionStatus] = useState<'idle' | 'pending' | 'generated'>('idle')
+  const [prescriptionId, setPrescriptionId] = useState<string | null>(null)
   
   const handleAnalyze = useCallback(async (file: File) => {
     setStep('analyzing')
@@ -89,9 +90,18 @@ export default function Diagnosis() {
     
     setIsGeneratingPrescription(true)
     try {
-      await prescriptionApi.generate({ diagnosis_id: result.id })
-      toast.success('Prescription generated!')
-      navigate('/app/prescriptions')
+      const response = await prescriptionApi.generate({ diagnosis_id: result.id })
+      const data = response.data
+      
+      setPrescriptionId(data.id)
+      
+      if (data.status === 'pending') {
+        setPrescriptionStatus('pending')
+        toast.success('Prescription generated and sent for doctor approval!')
+      } else {
+        setPrescriptionStatus('generated')
+        toast.success('Prescription generated!')
+      }
     } catch (error) {
       console.error('Prescription error:', error)
       toast.error('Failed to generate prescription.')
@@ -105,6 +115,8 @@ export default function Diagnosis() {
     setImage(null)
     setImagePreview(null)
     setResult(null)
+    setPrescriptionStatus('idle')
+    setPrescriptionId(null)
   }
   
   return (
@@ -176,85 +188,73 @@ export default function Diagnosis() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Diagnosis Results</CardTitle>
-                    <CardDescription>AI-powered acne severity assessment</CardDescription>
+                    <CardDescription>AI-powered acne analysis</CardDescription>
                   </div>
+                  {result.has_acne ? (
                   <span className={cn('px-4 py-2 rounded-full text-sm font-medium', getSeverityColor(result.severity))}>
                     {getSeverityLabel(result.severity)}
                   </span>
+                  ) : (
+                    <span className="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+                      No Acne Detected
+                    </span>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Type and Severity Side-by-Side */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Acne Type Card */}
-                  {result.acne_type && (
+                {!result.has_acne ? (
+                  /* No Acne Detected */
+                  <div className="p-6 border border-green-200 rounded-xl bg-green-50">
+                    <div className="flex items-start gap-4">
+                      <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-lg font-semibold text-green-900 mb-2">No Acne Detected</h4>
+                        <p className="text-sm text-green-700 mb-4">
+                          Great news! Our AI analysis indicates that no acne was detected in the uploaded image.
+                        </p>
+                        <div className="flex items-center justify-between text-xs text-green-600">
+                          <span>Detection Confidence</span>
+                          <span className="font-bold">{(result.binary_confidence * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="h-2 bg-green-200 rounded-full overflow-hidden mt-2">
+                          <div className="h-full bg-green-500 rounded-full" style={{ width: `${result.binary_confidence * 100}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Acne Detected - Show Severity */
+                  <>
+                    {/* Severity Card */}
                     <div className="p-4 border border-gray-200 rounded-xl bg-white">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium text-gray-700">Acne Type</h4>
-                        <span className={cn('px-3 py-1 rounded-full text-xs font-medium', getAcneTypeColor(result.acne_type))}>
-                          {getAcneTypeLabel(result.acne_type)}
+                        <h4 className="text-sm font-medium text-gray-700">Acne Severity</h4>
+                        <span className={cn('px-3 py-1 rounded-full text-xs font-medium', getSeverityColor(result.severity))}>
+                          {getSeverityLabel(result.severity)}
                         </span>
                       </div>
-                      {result.acne_type_confidence !== undefined && (
-                        <>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-gray-600">Confidence</span>
-                            <span className="text-xs font-bold text-primary-600">{(result.acne_type_confidence * 100).toFixed(1)}%</span>
-                          </div>
-                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
-                            <div className="h-full bg-primary-500 rounded-full" style={{ width: `${result.acne_type_confidence * 100}%` }} />
-                          </div>
-                        </>
-                      )}
-                      {result.acne_type_scores && (
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-600">Confidence</span>
+                        <span className="text-xs font-bold text-primary-600">{(result.confidence * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                    <div className="h-full bg-primary-500 rounded-full" style={{ width: `${result.confidence * 100}%` }} />
+                  </div>
+                      {result.severity_scores && (
                         <div className="space-y-1">
-                          <p className="text-xs font-medium text-gray-600 mb-2">All Types:</p>
+                          <p className="text-xs font-medium text-gray-600 mb-2">All Severities:</p>
                           <div className="space-y-1">
-                            {Object.entries(result.acne_type_scores)
+                            {Object.entries(result.severity_scores)
                               .sort(([, a], [, b]) => b - a)
-                              .map(([type, score]) => (
-                                <div key={type} className="flex items-center justify-between text-xs">
-                                  <span className="text-gray-600">{getAcneTypeLabel(type)}</span>
+                              .map(([severity, score]) => (
+                                <div key={severity} className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">{getSeverityLabel(severity)}</span>
                                   <span className="font-medium text-gray-900">{(score * 100).toFixed(1)}%</span>
                                 </div>
                               ))}
                           </div>
                         </div>
                       )}
-                    </div>
-                  )}
-                  
-                  {/* Severity Card */}
-                  <div className="p-4 border border-gray-200 rounded-xl bg-white">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-700">Severity</h4>
-                      <span className={cn('px-3 py-1 rounded-full text-xs font-medium', getSeverityColor(result.severity))}>
-                        {getSeverityLabel(result.severity)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-600">Confidence</span>
-                      <span className="text-xs font-bold text-primary-600">{(result.confidence * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
-                      <div className="h-full bg-primary-500 rounded-full" style={{ width: `${result.confidence * 100}%` }} />
-                    </div>
-                    {result.severity_scores && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-gray-600 mb-2">All Severities:</p>
-                        <div className="space-y-1">
-                          {Object.entries(result.severity_scores)
-                            .sort(([, a], [, b]) => b - a)
-                            .map(([severity, score]) => (
-                              <div key={severity} className="flex items-center justify-between text-xs">
-                                <span className="text-gray-600">{getSeverityLabel(severity)}</span>
-                                <span className="font-medium text-gray-900">{(score * 100).toFixed(1)}%</span>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
                 
                 <div>
@@ -279,12 +279,62 @@ export default function Diagnosis() {
                   </div>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button onClick={handleGeneratePrescription} isLoading={isGeneratingPrescription} className="flex-1">
-                    Generate Prescription
-                  </Button>
-                  <Button variant="outline" onClick={reset}>New Diagnosis</Button>
-                </div>
+                {/* Prescription Status Message */}
+                {prescriptionStatus === 'pending' && (
+                  <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                    <div className="flex items-start gap-3">
+                      <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-yellow-900 mb-1">Prescription Sent for Approval</h4>
+                        <p className="text-sm text-yellow-700 mb-3">
+                          Your prescription has been generated and forwarded to a doctor for review. 
+                          Please wait while the doctor approves your prescription. You will be notified once it's approved.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate('/app/prescriptions')}
+                            className="text-xs"
+                          >
+                            <FileText className="w-4 h-4 mr-1" />
+                            View Prescriptions
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Generate Prescription Button - Only show if not already generated */}
+                {prescriptionStatus === 'idle' && (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button onClick={handleGeneratePrescription} isLoading={isGeneratingPrescription} className="flex-1">
+                      Generate Prescription
+                    </Button>
+                    <Button variant="outline" onClick={reset}>New Diagnosis</Button>
+                  </div>
+                )}
+
+                {/* If prescription is generated (approved), show button to view */}
+                {prescriptionStatus === 'generated' && (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button onClick={() => navigate('/app/prescriptions')} className="flex-1">
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Prescription
+                    </Button>
+                    <Button variant="outline" onClick={reset}>New Diagnosis</Button>
+                  </div>
+                )}
+
+                {/* If pending, show new diagnosis button */}
+                {prescriptionStatus === 'pending' && (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button variant="outline" onClick={reset} className="flex-1">New Diagnosis</Button>
+                  </div>
+                )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </motion.div>
