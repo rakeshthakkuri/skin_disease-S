@@ -55,6 +55,16 @@ export const prescriptionApi = {
     api.post('/prescription/translate', data),
 }
 
+// Doctor API
+export const doctorApi = {
+  getPendingPrescriptions: () => api.get('/doctor/prescriptions/pending'),
+  getAllPrescriptions: () => api.get('/doctor/prescriptions'),
+  approvePrescription: (id: string, doctor_notes?: string) =>
+    api.post(`/doctor/prescriptions/${id}/approve`, { doctor_notes }),
+  rejectPrescription: (id: string, doctor_notes: string) =>
+    api.post(`/doctor/prescriptions/${id}/reject`, { doctor_notes }),
+}
+
 // Reminders API
 export const remindersApi = {
   create: (data: any) => api.post('/reminders/create', data),

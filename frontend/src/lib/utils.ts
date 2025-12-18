@@ -42,27 +42,4 @@ export function getSeverityLabel(severity: string): string {
   return labels[severity] || severity
 }
 
-export function getAcneTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    blackhead: 'Blackhead',
-    Pustula: 'Pustula',
-    whitehead: 'Whitehead',
-    cysts: 'Cysts',
-    papules: 'Papules',
-    nodules: 'Nodules',
-  }
-  return labels[type] || type.charAt(0).toUpperCase() + type.slice(1)
-}
-
-export function getAcneTypeColor(type: string): string {
-  const colors: Record<string, string> = {
-    blackhead: 'bg-gray-100 text-gray-800 border-gray-200',
-    Pustula: 'bg-red-100 text-red-800 border-red-200',
-    whitehead: 'bg-blue-100 text-blue-800 border-blue-200',
-    cysts: 'bg-purple-100 text-purple-800 border-purple-200',
-    papules: 'bg-orange-100 text-orange-800 border-orange-200',
-    nodules: 'bg-pink-100 text-pink-800 border-pink-200',
-  }
-  return colors[type] || 'bg-gray-100 text-gray-800 border-gray-200'
-}
 

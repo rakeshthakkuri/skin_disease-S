@@ -9,6 +9,7 @@ interface User {
   date_of_birth?: string
   gender?: string
   skin_type?: string
+  role?: string // 'patient' or 'doctor'
   preferences?: Record<string, any>
 }
 

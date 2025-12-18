@@ -14,6 +14,7 @@ import Diagnosis from './pages/Diagnosis'
 import Prescriptions from './pages/Prescriptions'
 import Reminders from './pages/Reminders'
 import Profile from './pages/Profile'
+import DoctorDashboard from './pages/DoctorDashboard'
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,7 @@ function App() {
           <Route path="diagnosis" element={<Diagnosis />} />
           <Route path="prescriptions" element={<Prescriptions />} />
           <Route path="reminders" element={<Reminders />} />
+          <Route path="doctor" element={<DoctorDashboard />} />
           <Route path="profile" element={<Profile />} />
         </Route>
         

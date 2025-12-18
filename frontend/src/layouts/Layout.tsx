@@ -1,10 +1,10 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Camera, FileText, Bell, Stethoscope, User, LogOut } from 'lucide-react'
+import { Home, Camera, FileText, Bell, Stethoscope, User, LogOut, ClipboardCheck } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useAuthStore } from '../store/authStore'
 
-const navItems = [
+const patientNavItems = [
   { path: '/app', icon: Home, label: 'Home', exact: true },
   { path: '/app/diagnosis', icon: Camera, label: 'Diagnosis' },
   { path: '/app/prescriptions', icon: FileText, label: 'Prescriptions' },
@@ -12,10 +12,20 @@ const navItems = [
   { path: '/app/profile', icon: User, label: 'Profile' },
 ]
 
+const doctorNavItems = [
+  { path: '/app', icon: Home, label: 'Home', exact: true },
+  { path: '/app/doctor', icon: ClipboardCheck, label: 'Dashboard' },
+  { path: '/app/prescriptions', icon: FileText, label: 'All Prescriptions' },
+  { path: '/app/profile', icon: User, label: 'Profile' },
+]
+
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  
+  const isDoctor = user?.role === 'doctor'
+  const navItems = isDoctor ? doctorNavItems : patientNavItems
   
   const isActive = (path: string, exact?: boolean) => {
     if (exact) return location.pathname === path

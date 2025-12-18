@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Camera, FileText, Bell, ArrowRight } from 'lucide-react'
+import { Camera, FileText, Bell, ArrowRight, ClipboardCheck } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { useAuthStore } from '@/store/authStore'
 
-const actions = [
+const patientActions = [
   {
     icon: Camera,
     title: 'New Diagnosis',
@@ -28,16 +29,38 @@ const actions = [
   },
 ]
 
+const doctorActions = [
+  {
+    icon: ClipboardCheck,
+    title: 'Doctor Dashboard',
+    description: 'Review and approve pending prescriptions',
+    path: '/app/doctor',
+    color: 'from-green-500 to-emerald-500',
+  },
+  {
+    icon: FileText,
+    title: 'All Prescriptions',
+    description: 'View all prescriptions',
+    path: '/app/prescriptions',
+    color: 'from-purple-500 to-pink-500',
+  },
+]
+
 export default function Home() {
+  const user = useAuthStore((state) => state.user)
+  const isDoctor = user?.role === 'doctor'
+  const actions = isDoctor ? doctorActions : patientActions
   return (
     <div className="space-y-8">
       {/* Welcome */}
       <div className="text-center py-8">
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-          Welcome to AcneAI 👋
+          {isDoctor ? 'Doctor Dashboard' : 'Welcome to AcneAI 👋'}
         </h1>
         <p className="text-gray-600 max-w-xl mx-auto">
-          Get AI-powered acne diagnosis, personalized prescriptions, and smart reminders to manage your skin health.
+          {isDoctor
+            ? 'Review and approve patient prescriptions. Review diagnosis images and AI-generated treatment plans.'
+            : 'Get AI-powered acne diagnosis, personalized prescriptions, and smart reminders to manage your skin health.'}
         </p>
       </div>
       
@@ -70,20 +93,39 @@ export default function Home() {
       </div>
       
       {/* Start CTA */}
-      <Card variant="elevated" className="bg-gradient-to-r from-primary-500 to-accent-500 text-white">
-        <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 p-8">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Ready for your diagnosis?</h2>
-            <p className="text-primary-100">Upload a skin image and get instant AI analysis.</p>
-          </div>
-          <Link to="/app/diagnosis">
-            <Button variant="secondary" size="lg" className="gap-2 whitespace-nowrap">
-              <Camera className="w-5 h-5" />
-              Start Diagnosis
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
+      {!isDoctor && (
+        <Card variant="elevated" className="bg-gradient-to-r from-primary-500 to-accent-500 text-white">
+          <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 p-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Ready for your diagnosis?</h2>
+              <p className="text-primary-100">Upload a skin image and get instant AI analysis.</p>
+            </div>
+            <Link to="/app/diagnosis">
+              <Button variant="secondary" size="lg" className="gap-2 whitespace-nowrap">
+                <Camera className="w-5 h-5" />
+                Start Diagnosis
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+      
+      {isDoctor && (
+        <Card variant="elevated" className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+          <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 p-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Review Pending Prescriptions</h2>
+              <p className="text-green-100">Check and approve patient prescriptions with diagnosis details.</p>
+            </div>
+            <Link to="/app/doctor">
+              <Button variant="secondary" size="lg" className="gap-2 whitespace-nowrap">
+                <ClipboardCheck className="w-5 h-5" />
+                Go to Dashboard
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
