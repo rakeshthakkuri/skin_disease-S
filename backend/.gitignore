@@ -10,3 +10,4 @@ uploads/*
 *.onnx
 model/*.onnx
 
+.env.example
