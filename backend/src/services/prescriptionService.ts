@@ -131,7 +131,8 @@ export async function generatePrescription(
   lesionCounts: Record<string, number>,
   clinicalMetadata: Record<string, any> = {},
   problemSummary?: Record<string, any>,
-  additionalNotes?: string
+  additionalNotes?: string,
+  acneType?: string | null
 ): Promise<{
   medications: any[];
   lifestyleRecommendations: string[];
@@ -144,7 +145,8 @@ export async function generatePrescription(
       severity,
       lesionCounts,
       clinicalMetadata,
-      additionalNotes
+      additionalNotes,
+      acneType
     );
     
     return prescription;
@@ -153,7 +155,7 @@ export async function generatePrescription(
     
     // Fallback to rule-based prescription if Gemini fails
     console.warn('Falling back to rule-based prescription generation');
-    return generatePrescriptionFallback(severity, lesionCounts, clinicalMetadata, additionalNotes);
+    return generatePrescriptionFallback(severity, lesionCounts, clinicalMetadata, additionalNotes, acneType);
   }
 }
 
@@ -164,7 +166,8 @@ function generatePrescriptionFallback(
   severity: string,
   lesionCounts: Record<string, number>,
   clinicalMetadata: Record<string, any> = {},
-  additionalNotes?: string
+  additionalNotes?: string,
+  acneType?: string | null
 ): {
   medications: any[];
   lifestyleRecommendations: string[];
@@ -194,7 +197,8 @@ function generatePrescriptionFallback(
   }
 
   // Generate reasoning
-  const reasoning = `Prescription generated based on ${severity} acne severity. ` +
+  const typeInfo = acneType ? ` and ${acneType} type` : '';
+  const reasoning = `Prescription generated based on ${severity} acne severity${typeInfo}. ` +
     `Treatment plan includes ${medications.length} medication(s) targeting inflammation and bacterial growth. ` +
     (additionalNotes ? `Additional notes: ${additionalNotes}. ` : '') +
     `Follow lifestyle recommendations for optimal results.`;

@@ -81,7 +81,8 @@ router.post(
         diagnosis.lesionCounts,
         diagnosis.clinicalMetadata || {},
         diagnosis.problemSummary || undefined,
-        additional_notes
+        additional_notes,
+        diagnosis.acneType
       );
 
       // Create prescription record
