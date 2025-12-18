@@ -1,0 +1,46 @@
+# Exclude training and development files from Docker builds
+*.ipynb
+*.pth
+acne_classifier.ipynb
+acne_severity_training.ipynb
+acne_efficientnet_b0_best.pth
+acne_mobilenet_v2_best.pth
+acne_resnet18_best.pth
+rename_nodules_folder.py
+
+# Datasets
+acne detection dataset/
+severity dataset/
+
+# Documentation
+Docs/
+
+# Development files
+.git
+.gitignore
+.vscode
+.idea
+*.md
+!README.md
+!DEPLOYMENT.md
+!PRODUCTION_README.md
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node modules (will be installed in container)
+**/node_modules/
+
+# Build artifacts
+**/dist/
+**/build/
+
+# Logs
+**/logs/
+*.log
+
+# Uploads
+**/uploads/
+
