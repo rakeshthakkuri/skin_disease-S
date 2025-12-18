@@ -84,13 +84,16 @@ router.post(
       const clinicalNotes = generateClinicalNotes(
         classification.severity,
         lesionCounts,
-        metadata
+        metadata,
+        classification.acneType
       );
 
       // Generate problem summary (simplified - can be enhanced later)
       const problemSummary = {
         severity: classification.severity,
         severity_index: classification.severityIndex,
+        acne_type: classification.acneType,
+        type_confidence: classification.typeConfidence,
         lesion_counts: lesionCounts,
         clinical_metadata: metadata,
         affected_areas: ['face'],
@@ -100,6 +103,7 @@ router.post(
       // Create diagnosis record
       const diagnosis = await createDiagnosis(user.id, {
         severity: classification.severity,
+        acneType: classification.acneType,
         confidence: Math.round(classification.confidence * 100),
         severityScores: classification.allScores,
         lesionCounts,
@@ -117,6 +121,9 @@ router.post(
         has_acne: classification.hasAcne,
         binary_confidence: classification.binaryConfidence,
         severity: diagnosis.severity,
+        acne_type: diagnosis.acneType,
+        type_confidence: classification.typeConfidence,
+        type_scores: classification.typeScores,
         confidence: diagnosis.confidence / 100.0,
         severity_scores: diagnosis.severityScores,
         lesion_counts: diagnosis.lesionCounts,
@@ -157,6 +164,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
     res.json({
       id: diagnosis.id,
       severity: diagnosis.severity,
+      acne_type: diagnosis.acneType,
       confidence: diagnosis.confidence / 100.0,
       severity_scores: diagnosis.severityScores,
       lesion_counts: diagnosis.lesionCounts,
@@ -186,6 +194,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
       diagnoses.map((d) => ({
         id: d.id,
         severity: d.severity,
+        acne_type: d.acneType,
         confidence: d.confidence / 100.0,
         severity_scores: d.severityScores,
         lesion_counts: d.lesionCounts,

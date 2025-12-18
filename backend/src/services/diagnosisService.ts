@@ -9,6 +9,7 @@ export async function createDiagnosis(
   userId: string,
   data: {
     severity: string;
+    acneType?: string | null;
     confidence: number;
     severityScores: Record<string, number>;
     lesionCounts: Record<string, number>;
@@ -57,12 +58,13 @@ export async function listDiagnoses(userId: string): Promise<Diagnosis[]> {
 }
 
 /**
- * Generate clinical notes based on severity and lesion counts
+ * Generate clinical notes based on severity, type, and lesion counts
  */
 export function generateClinicalNotes(
   severity: string,
   lesionCounts: Record<string, number>,
-  metadata: Record<string, any> = {}
+  metadata: Record<string, any> = {},
+  acneType?: string | null
 ): string {
   const notes: string[] = [];
   const total = Object.values(lesionCounts).reduce((sum, count) => sum + count, 0);
@@ -74,16 +76,21 @@ export function generateClinicalNotes(
     } else {
       notes.push('Minimal acne lesions detected. Skin appears relatively clear.');
     }
-  } else if (severity === 'mild') {
-    notes.push(`Mild acne detected with ${total} total lesions (primarily comedones and papules).`);
-  } else if (severity === 'moderate') {
-    notes.push(`Moderate acne with ${total} total lesions including papules and pustules.`);
-  } else if (severity === 'severe') {
-    notes.push(`Severe acne with ${total} total lesions including numerous pustules and nodules.`);
-  } else if (severity === 'very_severe') {
-    notes.push(`Very severe cystic acne with ${total} total lesions including nodules and cysts. Requires aggressive treatment.`);
   } else {
-    notes.push(`Acne severity: ${severity}. Total lesions detected: ${total}.`);
+    // Add acne type information if available
+    const typeInfo = acneType ? ` (Type: ${acneType})` : '';
+    
+    if (severity === 'mild') {
+      notes.push(`Mild acne detected${typeInfo} with ${total} total lesions (primarily comedones and papules).`);
+    } else if (severity === 'moderate') {
+      notes.push(`Moderate acne${typeInfo} with ${total} total lesions including papules and pustules.`);
+    } else if (severity === 'severe') {
+      notes.push(`Severe acne${typeInfo} with ${total} total lesions including numerous pustules and nodules.`);
+    } else if (severity === 'very_severe') {
+      notes.push(`Very severe cystic acne${typeInfo} with ${total} total lesions including nodules and cysts. Requires aggressive treatment.`);
+    } else {
+      notes.push(`Acne severity: ${severity}${typeInfo}. Total lesions detected: ${total}.`);
+    }
   }
 
   // Add specific lesion breakdown
