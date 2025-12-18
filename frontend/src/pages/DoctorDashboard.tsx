@@ -278,7 +278,7 @@ export default function DoctorDashboard() {
                           {prescription.diagnosis.image_url && (
                             <div className="mt-3">
                               <img
-                                src={`${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${prescription.diagnosis.image_url}`}
+                                src={`${(import.meta.env.VITE_API_URL || '').replace('/api/v1', '')}${prescription.diagnosis.image_url}`}
                                 alt="Diagnosis image"
                                 className="w-full max-w-md rounded-lg border border-blue-200"
                               />
