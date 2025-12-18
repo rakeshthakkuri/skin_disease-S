@@ -105,6 +105,10 @@ router.post(
             message: 'The password you entered is incorrect. Please try again.',
           });
         }
+        // If we get here, there's an unknown error
+        return res.status(401).json({
+          detail: 'Authentication failed',
+        });
       }
 
       const user = result.user;

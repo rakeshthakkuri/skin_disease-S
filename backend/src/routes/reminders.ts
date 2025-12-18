@@ -278,7 +278,7 @@ router.post('/auto-schedule/:prescription_id', authenticate, async (req: Request
         prescriptionId: prescription_id,
         title: `Medication: ${(med as any).name}`,
         message: `Time to apply/take ${(med as any).name}. ${(med as any).instructions || ''}`,
-        messageTelugu: null,
+        messageTelugu: undefined,
         frequency,
         times,
       });
