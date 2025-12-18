@@ -7,7 +7,6 @@ import { corsMiddleware } from './middleware/cors';
 import { securityHeaders } from './middleware/securityHeaders';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
-import { apiRateLimiter } from './middleware/rateLimiter';
 import { logger } from './utils/logger';
 import authRoutes from './routes/auth';
 import diagnosisRoutes from './routes/diagnosis';
@@ -39,7 +38,7 @@ if (!existsSync(logsDir)) {
 // Serve uploaded files
 app.use('/uploads', express.static(uploadsDir));
 
-// Health check endpoint (before rate limiting)
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -52,9 +51,6 @@ app.get('/health', (req, res) => {
     },
   });
 });
-
-// Apply rate limiting to API routes only
-app.use(apiRateLimiter);
 
 // API routes
 app.use(`${config.apiV1Prefix}/auth`, authRoutes);

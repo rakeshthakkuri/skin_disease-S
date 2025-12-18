@@ -33,8 +33,8 @@ export function rateLimiter(
   maxRequests: number = 100 // 100 requests per window
 ) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    // Skip rate limiting in development if configured
-    if (config.isDevelopment && config.debug) {
+    // Skip rate limiting in development mode
+    if (config.isDevelopment) {
       return next();
     }
 
@@ -70,8 +70,12 @@ export function rateLimiter(
 
 /**
  * Strict rate limiter for authentication endpoints
+ * In development: disabled
+ * In production: 5 requests per 15 minutes
  */
-export const authRateLimiter = rateLimiter(15 * 60 * 1000, 5); // 5 requests per 15 minutes
+export const authRateLimiter = config.isDevelopment 
+  ? (req: Request, res: Response, next: NextFunction) => next() // No rate limiting in dev
+  : rateLimiter(15 * 60 * 1000, 5); // 5 requests per 15 minutes in production
 
 /**
  * Standard rate limiter for API endpoints
