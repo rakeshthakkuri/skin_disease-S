@@ -42,4 +42,36 @@ export function getSeverityLabel(severity: string): string {
   return labels[severity] || severity
 }
 
+export function getAcneTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    Pustula: 'Pustule',
+    blackhead: 'Blackhead',
+    cysts: 'Cyst',
+    nodules: 'Nodule',
+    papules: 'Papule',
+    whitehead: 'Whitehead',
+  }
+  return labels[type] || type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+export function getLesionLabel(type: string, count?: number): string {
+  const labels: Record<string, { singular: string; plural: string }> = {
+    comedones: { singular: 'Comedone', plural: 'Comedones' },
+    papules: { singular: 'Papule', plural: 'Papules' },
+    pustules: { singular: 'Pustule', plural: 'Pustules' },
+    nodules: { singular: 'Nodule', plural: 'Nodules' },
+    cysts: { singular: 'Cyst', plural: 'Cysts' },
+  }
+  
+  const labelData = labels[type.toLowerCase()]
+  if (!labelData) {
+    // Fallback for unknown types
+    const baseLabel = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
+    return count === 1 ? baseLabel : baseLabel + 's'
+  }
+  
+  // Return singular if count is exactly 1, plural otherwise (including 0)
+  return count === 1 ? labelData.singular : labelData.plural
+}
+
 

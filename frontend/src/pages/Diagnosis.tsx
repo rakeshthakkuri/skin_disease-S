@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, Loader2, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
+import { cn, getSeverityColor, getSeverityLabel, getAcneTypeLabel } from '@/lib/utils'
 import { toast } from '@/components/ui/Toaster'
 import { diagnosisApi, prescriptionApi } from '@/lib/api'
 
@@ -18,6 +18,9 @@ interface DiagnosisResult {
   severity: string
   confidence: number
   severity_scores: Record<string, number>
+  acne_type: string | null
+  type_confidence: number | null
+  type_scores: Record<string, number> | null
   lesion_counts: Record<string, number>
   clinical_notes: string
   recommended_urgency: string
@@ -247,17 +250,60 @@ export default function Diagnosis() {
                       )}
                 </div>
                 
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Lesion Analysis</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    {Object.entries(result.lesion_counts).map(([type, count]) => (
-                      <div key={type} className="text-center p-3 bg-gray-50 rounded-xl">
-                        <p className="text-2xl font-bold text-gray-900">{count}</p>
-                        <p className="text-xs text-gray-500 capitalize">{type}</p>
+                {/* Acne Type Card */}
+                {result.acne_type && (
+                  <div className="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-700">Acne Type</h4>
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                        {getAcneTypeLabel(result.acne_type)}
+                      </span>
+                    </div>
+                    {result.type_confidence !== null && (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-600">Confidence</span>
+                          <span className="text-xs font-bold text-primary-600">{(result.type_confidence * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                          <div className="h-full bg-purple-500 rounded-full" style={{ width: `${result.type_confidence * 100}%` }} />
+                        </div>
+                      </>
+                    )}
+                    {result.type_scores && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-gray-600 mb-2">All Types:</p>
+                        <div className="space-y-1">
+                          {Object.entries(result.type_scores)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([type, score]) => (
+                              <div key={type} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{getAcneTypeLabel(type)}</span>
+                                <span className="font-medium text-gray-900">{(score * 100).toFixed(1)}%</span>
+                              </div>
+                            ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
+                )}
+                
+                {/* Acne Type Analysis */}
+                {result.type_scores && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Acne Type Analysis</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {Object.entries(result.type_scores)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([type, score]) => (
+                          <div key={type} className="text-center p-3 bg-gray-50 rounded-xl">
+                            <p className="text-2xl font-bold text-gray-900">{(score * 100).toFixed(0)}%</p>
+                            <p className="text-xs text-gray-500 mt-1">{getAcneTypeLabel(type)}</p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="p-4 bg-blue-50 rounded-xl">
                   <div className="flex items-start gap-3">
