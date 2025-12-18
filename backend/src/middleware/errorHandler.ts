@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -20,11 +21,14 @@ export function errorHandler(
     ? 'Internal server error'
     : err.message;
 
-  console.error('Error:', {
+  // Log error with context
+  logger.error('Request error', {
     message: err.message,
-    stack: config.isDevelopment ? err.stack : undefined,
+    stack: err.stack,
     path: req.path,
     method: req.method,
+    statusCode,
+    ip: req.ip || req.socket.remoteAddress,
   });
 
   res.status(statusCode).json({
