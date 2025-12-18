@@ -54,6 +54,7 @@ router.get('/prescriptions/pending', authenticate, requireDoctor, async (req: Re
             ? {
                 id: diagnosis.id,
                 severity: diagnosis.severity,
+                acne_type: diagnosis.acneType,
                 confidence: diagnosis.confidence,
                 lesion_counts: diagnosis.lesionCounts,
                 clinical_notes: diagnosis.clinicalNotes,
@@ -228,6 +229,7 @@ router.get('/prescriptions', authenticate, requireDoctor, async (req: Request, r
             ? {
                 id: diagnosis.id,
                 severity: diagnosis.severity,
+                acne_type: diagnosis.acneType,
                 confidence: diagnosis.confidence,
                 lesion_counts: diagnosis.lesionCounts,
                 clinical_notes: diagnosis.clinicalNotes,
