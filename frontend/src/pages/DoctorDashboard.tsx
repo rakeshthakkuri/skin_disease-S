@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FileText, CheckCircle, XCircle, Clock, User, Image as ImageIcon, Eye, Loader2 } from 'lucide-react'
+import { FileText, CheckCircle, XCircle, Clock, User, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
