@@ -14,7 +14,6 @@ uploads
 *.md
 !README.md
 ecosystem.config.js
-scripts
 *.test.ts
 *.spec.ts
 coverage

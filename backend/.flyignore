@@ -14,7 +14,6 @@ uploads
 *.md
 !README.md
 ecosystem.config.js
-scripts
 *.test.ts
 *.spec.ts
 coverage
@@ -25,4 +24,3 @@ acne_classifier.ipynb
 acne_severity_training.ipynb
 Dockerfile
 .dockerignore
-
