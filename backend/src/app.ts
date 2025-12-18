@@ -7,29 +7,54 @@ import { corsMiddleware } from './middleware/cors';
 import { securityHeaders } from './middleware/securityHeaders';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
+import { apiRateLimiter } from './middleware/rateLimiter';
+import { logger } from './utils/logger';
 import authRoutes from './routes/auth';
 import diagnosisRoutes from './routes/diagnosis';
 import prescriptionRoutes from './routes/prescription';
 import reminderRoutes from './routes/reminders';
 import doctorRoutes from './routes/doctor';
 import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 const app: Express = express();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(corsMiddleware);
 app.use(securityHeaders);
 app.use(requestLogger);
 
-// Serve uploaded files
-app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+// Ensure uploads and logs directories exist
+const uploadsDir = join(process.cwd(), 'uploads');
+const logsDir = join(process.cwd(), 'logs');
+if (!existsSync(uploadsDir)) {
+  mkdirSync(uploadsDir, { recursive: true });
+}
+if (!existsSync(logsDir)) {
+  mkdirSync(logsDir, { recursive: true });
+}
 
-// Health check endpoint
+// Serve uploaded files
+app.use('/uploads', express.static(uploadsDir));
+
+// Health check endpoint (before rate limiting)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: config.environment,
+    uptime: process.uptime(),
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+    },
+  });
 });
+
+// Apply rate limiting to API routes only
+app.use(apiRateLimiter);
 
 // API routes
 app.use(`${config.apiV1Prefix}/auth`, authRoutes);
@@ -55,27 +80,31 @@ async function startServer(): Promise<void> {
 
     // Start server
     app.listen(config.port, config.host, () => {
-      console.log('🚀 Server started');
-      console.log(`📍 Environment: ${config.environment}`);
-      console.log(`🌐 Server running at http://${config.host}:${config.port}`);
-      console.log(`📡 API available at http://${config.host}:${config.port}${config.apiV1Prefix}`);
+      logger.info('🚀 Server started', {
+        environment: config.environment,
+        host: config.host,
+        port: config.port,
+        apiPrefix: config.apiV1Prefix,
+      });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error('❌ Failed to start server', { error });
     process.exit(1);
   }
 }
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully...');
+  logger.info('SIGTERM received, shutting down gracefully...');
   await closeDatabase();
+  logger.info('Database connection closed');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully...');
+  logger.info('SIGINT received, shutting down gracefully...');
   await closeDatabase();
+  logger.info('Database connection closed');
   process.exit(0);
 });
 

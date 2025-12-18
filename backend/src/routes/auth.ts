@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { createUser, authenticateUser, updateUser } from '../services/userService';
 import { createAccessToken } from '../utils/jwt';
 import { authenticate } from '../middleware/auth';
+import { authRateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -12,6 +13,7 @@ const router = Router();
  */
 router.post(
   '/register',
+  authRateLimiter,
   [
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 6 }),
@@ -72,6 +74,7 @@ router.post(
  */
 router.post(
   '/login',
+  authRateLimiter,
   [
     body('email').isEmail().normalizeEmail(),
     body('password').notEmpty(),
