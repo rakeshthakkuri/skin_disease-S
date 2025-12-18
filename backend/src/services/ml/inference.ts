@@ -4,14 +4,16 @@ import { existsSync } from 'fs';
 import { preprocessImage } from './preprocess';
 import { Tensor } from 'onnxruntime-node';
 
-// Model paths - ONNX models should be in backend-node/model after conversion
+// Model paths - ONNX models should be in backend/model after conversion
 const MODEL_DIR = join(process.cwd(), 'model');
 const BINARY_MODEL_PATH = join(MODEL_DIR, 'acne_binary_efficientnet_b0_best.onnx');
 const SEVERITY_MODEL_PATH = join(MODEL_DIR, 'acne_severity_efficientnet_b0_best.onnx');
+const TYPE_MODEL_PATH = join(MODEL_DIR, 'acne_type_best.onnx');
 
 // Lazy-loaded model sessions
 let binarySession: ort.InferenceSession | null = null;
 let severitySession: ort.InferenceSession | null = null;
+let typeSession: ort.InferenceSession | null = null;
 
 /**
  * Load ONNX model session (lazy loading)
@@ -83,17 +85,25 @@ export async function initializeModels(): Promise<void> {
     console.warn(`   Model directory: ${MODEL_DIR}`);
   }
 
+  // Load type model
+  if (existsSync(TYPE_MODEL_PATH)) {
+    typeSession = await loadModel(TYPE_MODEL_PATH, 'Type');
+  } else {
+    console.warn(`⚠️  Type model not found at ${TYPE_MODEL_PATH}`);
+  }
+
   console.log('✅ ML models initialization complete');
   
   // Log which models are loaded
   console.log(`📊 Model Status:
     - Binary: ${binarySession ? '✅ Loaded' : '❌ Not loaded'}
-    - Severity: ${severitySession ? '✅ Loaded' : '❌ Not loaded'}`);
+    - Severity: ${severitySession ? '✅ Loaded' : '❌ Not loaded'}
+    - Type: ${typeSession ? '✅ Loaded' : '❌ Not loaded'}`);
   
   if (!binarySession || !severitySession) {
     console.error('❌ CRITICAL: Required models (binary or severity) are not loaded!');
     console.error('   Please convert PyTorch models to ONNX format using:');
-    console.error('   python backend-node/scripts/convert-models-to-onnx.py');
+    console.error('   python backend/scripts/convert-models-to-onnx.py');
   }
 }
 
@@ -282,7 +292,70 @@ export async function predictSeverity(imagePath: string): Promise<SeverityResult
 }
 
 /**
- * Two-stage classification: binary + severity (if acne detected)
+ * Acne type classification
+ */
+export interface TypeResult {
+  type: string;
+  typeIndex: number;
+  confidence: number;
+  allScores: Record<string, number>;
+}
+
+const TYPE_LABELS = ['Pustula', 'blackhead', 'cysts', 'nodules', 'papules', 'whitehead'];
+
+export async function predictType(imagePath: string): Promise<TypeResult | null> {
+  if (!typeSession) {
+    console.error('❌ Type model session not loaded');
+    return null;
+  }
+
+  let inputTensor: Tensor;
+  try {
+    inputTensor = await preprocessImage(imagePath);
+  } catch (error: any) {
+    console.error('❌ Image preprocessing failed:', error);
+    throw new Error(`Image preprocessing failed: ${error.message}`);
+  }
+
+  const logits = await runInference(typeSession, inputTensor);
+
+  if (!logits || logits.length < TYPE_LABELS.length) {
+    return null;
+  }
+
+  const probs = softmax(logits);
+  
+  // Debug: log raw outputs
+  console.log(`🔍 Type classification raw logits: [${Array.from(logits).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Type classification probabilities: [${Array.from(probs).map(x => x.toFixed(3)).join(', ')}]`);
+  console.log(`🔍 Type label mapping: ${TYPE_LABELS.map((l, i) => `${i}=${l}`).join(', ')}`);
+  
+  let maxIdx = 0;
+  let maxProb = probs[0];
+  for (let i = 1; i < probs.length; i++) {
+    if (probs[i] > maxProb) {
+      maxProb = probs[i];
+      maxIdx = i;
+    }
+  }
+
+  const allScores: Record<string, number> = {};
+  TYPE_LABELS.forEach((label, idx) => {
+    allScores[label] = probs[idx];
+  });
+
+  console.log(`🔍 Type prediction: index=${maxIdx}, type=${TYPE_LABELS[maxIdx]}, confidence=${maxProb.toFixed(3)}`);
+
+  return {
+    type: TYPE_LABELS[maxIdx],
+    typeIndex: maxIdx,
+    confidence: maxProb,
+    allScores,
+  };
+}
+
+/**
+ * Three-stage classification: binary + severity + type (if acne detected)
  */
 export interface ClassificationResult {
   hasAcne: boolean;
@@ -291,6 +364,9 @@ export interface ClassificationResult {
   confidence: number;
   allScores: Record<string, number>;
   severityIndex: number;
+  acneType: string | null;
+  typeConfidence: number | null;
+  typeScores: Record<string, number> | null;
 }
 
 export async function classify(imagePath: string): Promise<ClassificationResult | null> {
@@ -316,6 +392,9 @@ export async function classify(imagePath: string): Promise<ClassificationResult 
       confidence: binaryResult.confidence,
       allScores: { clear: 1.0, mild: 0, moderate: 0, severe: 0, very_severe: 0 },
       severityIndex: 0,
+      acneType: null,
+      typeConfidence: null,
+      typeScores: null,
     };
   }
 
@@ -330,6 +409,18 @@ export async function classify(imagePath: string): Promise<ClassificationResult 
   } catch (error: any) {
     console.error('❌ Severity classification error:', error);
     throw error;
+  }
+
+  // Stage 3: Type classification
+  let typeResult: TypeResult | null = null;
+  try {
+    typeResult = await predictType(imagePath);
+    if (!typeResult) {
+      console.warn('⚠️  Type classification returned null, continuing without type');
+    }
+  } catch (error: any) {
+    console.warn('⚠️  Type classification error, continuing without type:', error);
+    // Don't throw - type is optional, severity is required
   }
 
   // Combine all scores
@@ -354,6 +445,9 @@ export async function classify(imagePath: string): Promise<ClassificationResult 
     confidence: severityResult.confidence,
     allScores,
     severityIndex: severityResult.severityIndex,
+    acneType: typeResult?.type || null,
+    typeConfidence: typeResult?.confidence || null,
+    typeScores: typeResult?.allScores || null,
   };
 }
 
