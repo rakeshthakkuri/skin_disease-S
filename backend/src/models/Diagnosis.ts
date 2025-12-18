@@ -21,6 +21,9 @@ export class Diagnosis {
   @Column({ type: 'varchar' })
   severity!: string;
 
+  @Column({ name: 'acne_type', type: 'varchar', nullable: true })
+  acneType!: string | null;
+
   @Column({ type: 'integer' })
   confidence!: number;
 
