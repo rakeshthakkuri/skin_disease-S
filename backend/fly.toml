@@ -1,42 +1,38 @@
-# Fly.io configuration for AcneAI Backend
-# Generated for production deployment
+# fly.toml app configuration file generated for acneai-backend on 2025-12-18T23:17:20+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "acneai-backend"
-primary_region = "iad"  # Change to your preferred region (iad, ord, dfw, etc.)
+app = 'acneai-backend'
+primary_region = 'bom'
 
 [build]
-  dockerfile = "Dockerfile.fly"
+  dockerfile = 'Dockerfile.fly'
+
+[deploy]
+  strategy = 'immediate'
 
 [env]
-  ENVIRONMENT = "production"
-  NODE_ENV = "production"
-  PORT = "8000"
+  ENVIRONMENT = 'production'
+  NODE_ENV = 'production'
+  PORT = '8000'
 
 [http_service]
   internal_port = 8000
   force_https = true
-  auto_stop_machines = false
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 1
-  processes = ["app"]
+  min_machines_running = 0
+  processes = ['app']
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    timeout = "5s"
-    path = "/health"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-  cpu_kind = "shared"
+  cpu_kind = 'shared'
   cpus = 1
   memory_mb = 512
-
-# Optional: Uncomment to add persistent storage for uploads
-# [[mounts]]
-#   source = "uploads_data"
-#   destination = "/app/uploads"
-
-[deploy]
-  strategy = "immediate"
-
