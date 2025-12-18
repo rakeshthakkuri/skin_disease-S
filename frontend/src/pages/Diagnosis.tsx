@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, X, Loader2, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react'
+import { Upload, Loader2, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
@@ -26,12 +26,9 @@ interface DiagnosisResult {
 export default function Diagnosis() {
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>('upload')
-  const [image, setImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [result, setResult] = useState<DiagnosisResult | null>(null)
   const [isGeneratingPrescription, setIsGeneratingPrescription] = useState(false)
   const [prescriptionStatus, setPrescriptionStatus] = useState<'idle' | 'pending' | 'generated'>('idle')
-  const [prescriptionId, setPrescriptionId] = useState<string | null>(null)
   
   const handleAnalyze = useCallback(async (file: File) => {
     setStep('analyzing')
@@ -70,8 +67,6 @@ export default function Diagnosis() {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
     if (file) {
-      setImage(file)
-      setImagePreview(URL.createObjectURL(file))
       // Automatically start analysis
       handleAnalyze(file)
     }
@@ -93,8 +88,6 @@ export default function Diagnosis() {
       const response = await prescriptionApi.generate({ diagnosis_id: result.id })
       const data = response.data
       
-      setPrescriptionId(data.id)
-      
       if (data.status === 'pending') {
         setPrescriptionStatus('pending')
         toast.success('Prescription generated and sent for doctor approval!')
@@ -112,11 +105,8 @@ export default function Diagnosis() {
   
   const reset = () => {
     setStep('upload')
-    setImage(null)
-    setImagePreview(null)
     setResult(null)
     setPrescriptionStatus('idle')
-    setPrescriptionId(null)
   }
   
   return (
