@@ -6,13 +6,19 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
+    "build:prod": "tsc && npm run verify",
     "start": "node dist/app.js",
+    "start:prod": "NODE_ENV=production node dist/app.js",
     "setup:db": "ts-node scripts/setup-db.ts",
     "reset:db": "ts-node scripts/reset-db.ts",
     "create:doctor": "ts-node scripts/create-doctor.ts",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate",
     "migration:run": "typeorm-ts-node-commonjs migration:run",
-    "migration:revert": "typeorm-ts-node-commonjs migration:revert"
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert",
+    "prestart": "npm run build",
+    "verify": "ts-node scripts/verify-build.ts",
+    "lint": "echo 'Linting not configured'",
+    "test": "echo 'Tests not configured'"
   },
   "keywords": [
     "acne",
