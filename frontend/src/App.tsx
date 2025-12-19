@@ -12,6 +12,7 @@ import Register from './pages/Register'
 import Home from './pages/Home'
 import Diagnosis from './pages/Diagnosis'
 import Prescriptions from './pages/Prescriptions'
+import PrescriptionDetail from './pages/PrescriptionDetail'
 import Reminders from './pages/Reminders'
 import Profile from './pages/Profile'
 import DoctorDashboard from './pages/DoctorDashboard'
@@ -48,6 +49,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="diagnosis" element={<Diagnosis />} />
           <Route path="prescriptions" element={<Prescriptions />} />
+          <Route path="prescriptions/:id" element={<PrescriptionDetail />} />
           <Route path="reminders" element={<Reminders />} />
           <Route path="doctor" element={<DoctorDashboard />} />
           <Route path="profile" element={<Profile />} />

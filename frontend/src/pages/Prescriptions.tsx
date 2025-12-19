@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FileText, Globe, Pill, AlertTriangle, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle, XCircle } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { FileText, Loader2, Clock, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 import { cn, getSeverityColor, getSeverityLabel } from '@/lib/utils'
 import { prescriptionApi } from '@/lib/api'
-import { toast } from '@/components/ui/Toaster'
 
 interface Prescription {
   id: string
@@ -21,11 +20,10 @@ interface Prescription {
 }
 
 export default function Prescriptions() {
+  const navigate = useNavigate()
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [language, setLanguage] = useState<'en' | 'te'>('en')
-  const [translatedContent, setTranslatedContent] = useState<Record<string, any>>({})
+  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   
   useEffect(() => {
     loadPrescriptions()
@@ -42,24 +40,8 @@ export default function Prescriptions() {
     }
   }
   
-  const handleTranslate = async (prescriptionId: string, targetLang: 'en' | 'te') => {
-    try {
-      const response = await prescriptionApi.translate({
-        prescription_id: prescriptionId,
-        target_language: targetLang
-      })
-      setTranslatedContent({
-        ...translatedContent,
-        [`${prescriptionId}_${targetLang}`]: response.data.translated_content
-      })
-      toast.success(`Translated to ${targetLang === 'te' ? 'Telugu' : 'English'}`)
-    } catch (error) {
-      toast.error('Translation failed')
-    }
-  }
-  
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id)
+  const handlePrescriptionClick = (id: string) => {
+    navigate(`/app/prescriptions/${id}`)
   }
   
   if (loading) {
@@ -81,17 +63,28 @@ export default function Prescriptions() {
   }
 
   // Show all prescriptions (approved, pending, rejected) for patients
-  const visiblePrescriptions = prescriptions.filter(p => 
-    p.status === 'approved' || p.status === 'pending' || p.status === 'rejected'
+  const visiblePrescriptions = prescriptions.filter(
+    (p) =>
+      p.status === 'approved' ||
+      p.status === 'pending' ||
+      p.status === 'rejected'
   )
   
-  // Sort prescriptions: pending first, then rejected, then approved (newest first within each group)
+  // Sort prescriptions: newest first, grouped by status
   const sortedPrescriptions = [...visiblePrescriptions].sort((a, b) => {
     const statusOrder = { pending: 0, rejected: 1, approved: 2 }
-    const statusDiff = (statusOrder[a.status as keyof typeof statusOrder] || 3) - (statusOrder[b.status as keyof typeof statusOrder] || 3)
+    const statusDiff =
+      (statusOrder[a.status as keyof typeof statusOrder] || 3) -
+      (statusOrder[b.status as keyof typeof statusOrder] || 3)
     if (statusDiff !== 0) return statusDiff
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
+
+  // Apply status filter
+  const filteredPrescriptions =
+    statusFilter === 'all'
+      ? sortedPrescriptions
+      : sortedPrescriptions.filter((p) => p.status === statusFilter)
   
   // Count prescriptions by status
   const statusCounts = {
@@ -102,20 +95,38 @@ export default function Prescriptions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 sticky top-0 z-10 bg-white/80 backdrop-blur-sm pb-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Your Prescriptions</h1>
-          <p className="text-gray-600 mt-1">View and manage your treatment plans</p>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">
+            Quickly review all your treatment plans, filters, and languages in one place.
+          </p>
         </div>
         
-        <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
-          <button onClick={() => setLanguage('en')} className={cn('px-4 py-2 rounded-md text-sm font-medium transition-colors', language === 'en' ? 'bg-white shadow text-gray-900' : 'text-gray-600')}>
-            <Globe className="w-4 h-4 inline mr-1" />English
-          </button>
-          <button onClick={() => setLanguage('te')} className={cn('px-4 py-2 rounded-md text-sm font-medium transition-colors', language === 'te' ? 'bg-white shadow text-gray-900' : 'text-gray-600')}>
-            <Globe className="w-4 h-4 inline mr-1" />తెలుగు
-          </button>
-        </div>
+        <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg">
+            {(['all', 'approved', 'pending', 'rejected'] as const).map((status) => {
+              const labelMap: Record<typeof status, string> = {
+                all: 'All',
+                approved: 'Approved',
+                pending: 'Pending',
+                rejected: 'Rejected',
+              }
+              return (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs md:text-sm font-medium transition-colors',
+                    statusFilter === status
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  )}
+                >
+                  {labelMap[status]}
+                </button>
+              )
+            })}
+          </div>
       </div>
 
       {/* Status Summary */}
@@ -152,7 +163,7 @@ export default function Prescriptions() {
       )}
       
       <div className="space-y-4">
-        {sortedPrescriptions.map((prescription) => {
+        {filteredPrescriptions.map((prescription) => {
           // Show status badge
           const getStatusBadge = () => {
             if (prescription.status === 'pending') {
@@ -184,151 +195,60 @@ export default function Prescriptions() {
 
           // Don't show full prescription details if not approved
           const canViewDetails = prescription.status === 'approved'
-          const translated = canViewDetails ? translatedContent[`${prescription.id}_${language}`] : null
-          const displayMeds = canViewDetails ? (translated?.medications || prescription.medications) : []
-          const displayRecs = canViewDetails ? (translated?.lifestyle_recommendations || prescription.lifestyle_recommendations) : []
-          const displayInstructions = canViewDetails ? (translated?.follow_up_instructions || prescription.follow_up_instructions) : ''
           
           return (
-            <motion.div key={prescription.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div
+              key={prescription.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
               <Card variant="glass">
-                <div onClick={() => toggleExpand(prescription.id)} className="p-6 cursor-pointer">
+                <div
+                  onClick={() => handlePrescriptionClick(prescription.id)}
+                  className="p-6 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
+                >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
                         <FileText className="w-6 h-6 text-primary-600" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <h3 className="font-semibold text-gray-900">Prescription #{prescription.id}</h3>
-                          <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getSeverityColor(prescription.severity))}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap mb-2">
+                          <h3 className="font-semibold text-gray-900">
+                            Prescription #{prescription.id}
+                          </h3>
+                          <span
+                            className={cn(
+                              'px-2 py-1 rounded-full text-xs font-medium',
+                              getSeverityColor(prescription.severity)
+                            )}
+                          >
                             {getSeverityLabel(prescription.severity)}
                           </span>
                           {getStatusBadge()}
                         </div>
                         {canViewDetails ? (
-                          <p className="text-sm text-gray-500 mt-1">{prescription.medications.length} medication(s)</p>
+                          <p className="text-sm text-gray-500">
+                            {prescription.medications.length} medication(s) • Created{' '}
+                            {new Date(prescription.created_at).toLocaleDateString()}
+                          </p>
                         ) : (
-                          <p className="text-sm text-gray-500 mt-1">
-                            {prescription.status === 'pending' 
+                          <p className="text-sm text-gray-500">
+                            {prescription.status === 'pending'
                               ? 'Awaiting doctor approval'
                               : prescription.status === 'rejected'
                               ? 'Prescription was rejected by doctor'
                               : 'Status: ' + prescription.status}
+                            {' • '}
+                            Created{' '}
+                            {new Date(prescription.created_at).toLocaleDateString()}
                           </p>
                         )}
                       </div>
                     </div>
-                    {expandedId === prescription.id ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0 ml-4" />
                   </div>
                 </div>
-                
-                {expandedId === prescription.id && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="border-t">
-                    <CardContent className="space-y-6">
-                      {!canViewDetails && (
-                        <div className={cn(
-                          'p-4 rounded-xl',
-                          prescription.status === 'pending' ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'
-                        )}>
-                          <div className="flex items-start gap-3">
-                            {prescription.status === 'pending' ? (
-                              <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            )}
-                            <div className="flex-1">
-                              <h4 className={cn('text-sm font-medium mb-1', prescription.status === 'pending' ? 'text-yellow-900' : 'text-red-900')}>
-                                {prescription.status === 'pending' ? 'Prescription Sent for Doctor Approval' : 'Prescription Rejected'}
-                              </h4>
-                              <p className={cn('text-sm mb-2', prescription.status === 'pending' ? 'text-yellow-700' : 'text-red-700')}>
-                                {prescription.status === 'pending'
-                                  ? 'Your prescription has been generated and forwarded to a doctor for review. Please wait while the doctor approves your prescription. You will be able to view the full prescription details once it is approved.'
-                                  : prescription.doctor_notes || 'This prescription was rejected by the doctor.'}
-                              </p>
-                              {prescription.status === 'pending' && (
-                                <div className="mt-3 p-2 bg-yellow-100 rounded-lg">
-                                  <p className="text-xs text-yellow-800">
-                                    <strong>Status:</strong> Awaiting doctor review
-                                  </p>
-                                </div>
-                              )}
-                              {prescription.status === 'rejected' && prescription.doctor_notes && (
-                                <div className="mt-3 p-3 bg-red-100 rounded-lg border border-red-200">
-                                  <p className="text-xs font-medium text-red-900 mb-1">Doctor's Notes:</p>
-                                  <p className="text-xs text-red-800">{prescription.doctor_notes}</p>
-                                </div>
-                              )}
-                              {prescription.status === 'rejected' && prescription.approved_at && (
-                                <div className="mt-2 text-xs text-red-600">
-                                  Rejected on: {new Date(prescription.approved_at).toLocaleDateString()}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {canViewDetails && (
-                        <>
-                          {language === 'te' && !translated && (
-                            <Button variant="outline" size="sm" onClick={() => handleTranslate(prescription.id, 'te')}>
-                              <Globe className="w-4 h-4 mr-2" />Translate to Telugu
-                            </Button>
-                          )}
-                      
-                      <div>
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-3">
-                          <Pill className="w-4 h-4" />Medications
-                        </h4>
-                        <div className="space-y-4">
-                          {displayMeds.map((med: any, i: number) => (
-                            <div key={i} className="p-4 bg-gray-50 rounded-xl">
-                              <h5 className="font-medium text-gray-900 mb-2">{med.name}</h5>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                                <div><span className="text-gray-500">Dosage:</span><p className="font-medium">{med.dosage}</p></div>
-                                <div><span className="text-gray-500">Frequency:</span><p className="font-medium">{med.frequency}</p></div>
-                                <div><span className="text-gray-500">Duration:</span><p className="font-medium">{med.duration}</p></div>
-                              </div>
-                              <p className="text-sm text-gray-600 mb-2">{med.instructions}</p>
-                              {med.warnings?.length > 0 && (
-                                <div className="flex items-start gap-2 p-2 bg-yellow-50 rounded-lg">
-                                  <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                                  <span className="text-xs text-yellow-800">{med.warnings.join(' • ')}</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 mb-3">Lifestyle Recommendations</h4>
-                        <ul className="space-y-2">
-                          {displayRecs.map((rec: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                              <span className="text-green-500">✓</span>{rec}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      
-                      <div className="p-4 bg-blue-50 rounded-xl">
-                        <h4 className="text-sm font-medium text-blue-900 mb-2">Follow-up Instructions</h4>
-                        <p className="text-sm text-blue-800">{displayInstructions}</p>
-                      </div>
-                      
-                      {prescription.doctor_notes && (
-                        <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-                          <h4 className="text-sm font-medium text-green-900 mb-2">Doctor Notes</h4>
-                          <p className="text-sm text-green-800">{prescription.doctor_notes}</p>
-                        </div>
-                      )}
-                      </>
-                      )}
-                    </CardContent>
-                  </motion.div>
-                )}
               </Card>
             </motion.div>
           )
