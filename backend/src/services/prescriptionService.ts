@@ -2,7 +2,7 @@ import { AppDataSource } from '../database/connection';
 import { Prescription } from '../models/Prescription';
 import { Diagnosis } from '../models/Diagnosis';
 import { v4 as uuidv4 } from 'uuid';
-import { generatePrescriptionWithGemini } from './geminiService';
+import { generatePrescriptionWithGemini, translatePrescriptionWithGemini } from './geminiService';
 
 // Treatment guidelines (rule-based)
 const TREATMENT_DB: Record<string, any> = {
@@ -291,46 +291,89 @@ export async function listPrescriptions(userId: string): Promise<Prescription[]>
 }
 
 /**
- * Translate prescription (simplified - can be enhanced)
+ * Translate prescription content to a target language.
+ * Uses Gemini when available for full-text translation, with a simple
+ * phrase-based fallback.
  */
-export function translatePrescription(
+export async function translatePrescription(
   medications: any[],
   recommendations: string[],
   instructions: string,
-  targetLanguage: string
-): {
+  targetLanguage: 'en' | 'te' | 'hi'
+): Promise<{
   medications: any[];
   lifestyleRecommendations: string[];
   followUpInstructions: string;
-} {
-  // Simple translation dictionary
-  const terms: Record<string, string> = {
-    'apply': 'రాయండి',
+}> {
+  if (targetLanguage === 'en') {
+    return {
+      medications,
+      lifestyleRecommendations: recommendations,
+      followUpInstructions: instructions,
+    };
+  }
+
+  // Try Gemini translation first for hi/te
+  if (targetLanguage === 'hi' || targetLanguage === 'te') {
+    try {
+      const translated = await translatePrescriptionWithGemini(
+        {
+          medications,
+          lifestyleRecommendations: recommendations,
+          followUpInstructions: instructions,
+        },
+        targetLanguage
+      );
+
+      return translated;
+    } catch (error) {
+      // Fallback to simple dictionary below
+      // eslint-disable-next-line no-console
+      console.error('Falling back to simple translation helper:', error);
+    }
+  }
+
+  // Simple phrase dictionaries – can be replaced by a proper translation service later
+  const teluguTerms: Record<string, string> = {
+    'apply': 'రాయకండి',
     'take': 'తీసుకోండి',
     'daily': 'రోజూ',
     'twice daily': 'రోజుకు రెండుసార్లు',
     'once daily': 'రోజుకు ఒకసారి',
     'at night': 'రాత్రి',
     'morning': 'ఉదయం',
+    'evening': 'సాయంత్రం',
     'with food': 'ఆహారంతో',
     'weeks': 'వారాలు',
     'months': 'నెలలు',
   };
 
-  if (targetLanguage === 'en') {
-    return { medications, lifestyleRecommendations: recommendations, followUpInstructions: instructions };
-  }
+  const hindiTerms: Record<string, string> = {
+    'apply': 'लगाएं',
+    'take': 'लें',
+    'daily': 'रोजाना',
+    'twice daily': 'दिन में दो बार',
+    'once daily': 'दिन में एक बार',
+    'at night': 'रात में',
+    'morning': 'सुबह',
+    'evening': 'शाम',
+    'with food': 'खाने के साथ',
+    'weeks': 'हफ्ते',
+    'months': 'महीने',
+  };
 
-  // Simple translation for Telugu (can be enhanced with proper translation service)
+  const terms = targetLanguage === 'te' ? teluguTerms : hindiTerms;
+
   const translateText = (text: string): string => {
+    if (!text) return text;
     let translated = text;
-    Object.entries(terms).forEach(([en, te]) => {
-      translated = translated.replace(new RegExp(en, 'gi'), te);
+    Object.entries(terms).forEach(([en, localized]) => {
+      translated = translated.replace(new RegExp(en, 'gi'), localized);
     });
     return translated;
   };
 
-  const translatedMedications = medications.map(med => ({
+  const translatedMedications = medications.map((med) => ({
     ...med,
     name: translateText(med.name),
     instructions: translateText(med.instructions),

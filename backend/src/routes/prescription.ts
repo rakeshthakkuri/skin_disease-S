@@ -197,7 +197,7 @@ router.post(
   authenticate,
   [
     body('prescription_id').notEmpty(),
-    body('target_language').isIn(['en', 'te']),
+    body('target_language').isIn(['en', 'te', 'hi']),
   ],
   async (req: Request, res: Response) => {
     try {
@@ -214,18 +214,22 @@ router.post(
         return res.status(404).json({ detail: 'Prescription not found' });
       }
 
-      const translated = translatePrescription(
+      const translated = await translatePrescription(
         prescription.medications,
         prescription.lifestyleRecommendations,
         prescription.followUpInstructions,
-        target_language
+        target_language as 'en' | 'te' | 'hi'
       );
 
       res.json({
         prescription_id,
-        original_language: target_language === 'te' ? 'en' : 'te',
+        original_language: 'en',
         target_language,
-        translated_content: translated,
+        translated_content: {
+          medications: translated.medications,
+          lifestyle_recommendations: translated.lifestyleRecommendations,
+          follow_up_instructions: translated.followUpInstructions,
+        },
         translated_at: new Date().toISOString(),
       });
     } catch (error) {

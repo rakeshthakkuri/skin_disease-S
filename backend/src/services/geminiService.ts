@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config';
 
 // Initialize Gemini AI
-const genAI = config.geminiApiKey 
+const genAI = config.geminiApiKey
   ? new GoogleGenerativeAI(config.geminiApiKey)
   : null;
 
@@ -22,13 +22,13 @@ export async function generatePrescriptionWithGemini(
   reasoning: string;
 }> {
   if (!genAI) {
-    throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY environment variable.');
+    throw new Error(
+      'Gemini API key is not configured. Please set GEMINI_API_KEY environment variable.'
+    );
   }
 
-  // Use gemini-2.5-flash for faster responses
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  // Build prompt with severity and context
   const severityLabels: Record<string, string> = {
     clear: 'Clear (no acne)',
     mild: 'Mild',
@@ -46,20 +46,23 @@ export async function generatePrescriptionWithGemini(
     whitehead: 'Whitehead (closed comedone)',
   };
 
-  // Format lesion counts with proper labels
-  const lesionInfo = Object.entries(lesionCounts)
-    .filter(([, count]) => count > 0) // Only show non-zero counts
-    .map(([type, count]) => {
-      const label = type.charAt(0).toUpperCase() + type.slice(1);
-      return `${label}: ${count}`;
-    })
-    .join(', ') || 'No lesions detected';
+  const lesionInfo =
+    Object.entries(lesionCounts)
+      .filter(([, count]) => count > 0)
+      .map(([type, count]) => {
+        const label = type.charAt(0).toUpperCase() + type.slice(1);
+        return `${label}: ${count}`;
+      })
+      .join(', ') || 'No lesions detected';
 
-  const allergies = clinicalMetadata.allergies 
-    ? `Known allergies: ${Array.isArray(clinicalMetadata.allergies) ? clinicalMetadata.allergies.join(', ') : clinicalMetadata.allergies}`
+  const allergies = clinicalMetadata.allergies
+    ? `Known allergies: ${
+        Array.isArray(clinicalMetadata.allergies)
+          ? clinicalMetadata.allergies.join(', ')
+          : clinicalMetadata.allergies
+      }`
     : 'No known allergies';
 
-  // Build comprehensive diagnosis information
   let diagnosisInfo = `**Diagnosis Summary:**
 - **Severity Level:** ${severityLabels[severity] || severity}`;
 
@@ -70,13 +73,14 @@ export async function generatePrescriptionWithGemini(
 
   diagnosisInfo += `\n- **Lesion Distribution:** ${lesionInfo}`;
 
-  // Add clinical context
   const clinicalContext: string[] = [];
   if (clinicalMetadata.acne_duration_months) {
-    clinicalContext.push(`Acne duration: ${clinicalMetadata.acne_duration_months} months`);
+    clinicalContext.push(
+      `Acne duration: ${clinicalMetadata.acne_duration_months} months`
+    );
   }
   if (clinicalMetadata.previous_treatments) {
-    const prevTreatments = Array.isArray(clinicalMetadata.previous_treatments) 
+    const prevTreatments = Array.isArray(clinicalMetadata.previous_treatments)
       ? clinicalMetadata.previous_treatments.join(', ')
       : clinicalMetadata.previous_treatments;
     clinicalContext.push(`Previous treatments: ${prevTreatments}`);
@@ -85,29 +89,42 @@ export async function generatePrescriptionWithGemini(
     clinicalContext.push(`Skin type: ${clinicalMetadata.skin_type}`);
   }
 
-  // Build treatment guidelines based on acne type
   let treatmentGuidelines = '';
   if (acneType) {
     const typeDescription = acneTypeLabels[acneType] || acneType;
     treatmentGuidelines += `- The patient has ${typeDescription} type acne, which requires specific treatment approaches:\n`;
-    
+
     if (acneType === 'Pustula' || acneType === 'pustules') {
-      treatmentGuidelines += '  • Focus on anti-inflammatory and antibacterial treatments (e.g., benzoyl peroxide, topical antibiotics)\n';
+      treatmentGuidelines +=
+        '  • Focus on anti-inflammatory and antibacterial treatments (e.g., benzoyl peroxide, topical antibiotics)\n';
     } else if (acneType === 'blackhead' || acneType === 'whitehead') {
-      treatmentGuidelines += '  • Focus on comedolytic treatments (e.g., salicylic acid, retinoids) to unclog pores\n';
+      treatmentGuidelines +=
+        '  • Focus on comedolytic treatments (e.g., salicylic acid, retinoids) to unclog pores\n';
     } else if (acneType === 'cysts' || acneType === 'nodules') {
-      treatmentGuidelines += '  • Requires aggressive treatment with oral medications (e.g., isotretinoin, oral antibiotics) and may need dermatologist referral\n';
+      treatmentGuidelines +=
+        '  • Requires aggressive treatment with oral medications (e.g., isotretinoin, oral antibiotics) and may need dermatologist referral\n';
     } else if (acneType === 'papules') {
-      treatmentGuidelines += '  • Focus on anti-inflammatory treatments and gentle exfoliation\n';
+      treatmentGuidelines +=
+        '  • Focus on anti-inflammatory treatments and gentle exfoliation\n';
     }
   }
-  
-  treatmentGuidelines += `- For ${severityLabels[severity] || severity} severity acne, follow evidence-based treatment protocols\n`;
-  treatmentGuidelines += '- Consider patient allergies when recommending medications\n';
-  treatmentGuidelines += '- Provide age-appropriate dosages and clear instructions';
+
+  treatmentGuidelines += `- For ${
+    severityLabels[severity] || severity
+  } severity acne, follow evidence-based treatment protocols\n`;
+  treatmentGuidelines +=
+    '- Consider patient allergies when recommending medications\n';
+  treatmentGuidelines +=
+    '- Provide age-appropriate dosages and clear instructions';
+
+  const clinicalInfo = clinicalContext.length
+    ? `\n- ${clinicalContext.join('\n- ')}`
+    : '';
 
   const patientInfo = `**Patient Information:**
-- ${allergies}${clinicalContext.length > 0 ? `\n- ${clinicalContext.join('\n- ')}` : ''}${additionalNotes ? `\n- **Additional Notes:** ${additionalNotes}` : ''}`;
+- ${allergies}${clinicalInfo}${
+    additionalNotes ? `\n- **Additional Notes:** ${additionalNotes}` : ''
+  }`;
 
   const severityText = severityLabels[severity] || severity;
   const acneTypeText = acneType ? `${acneType} type and ` : '';
@@ -144,7 +161,11 @@ ${treatmentGuidelines}
 
 **Important Requirements:**
 1. Tailor medications specifically to the ${acneTypeText}${severityText} severity
-2. ${severity === 'severe' || severity === 'very_severe' ? 'Include oral medications as severity warrants. Consider referral to dermatologist for very severe cases.' : 'Start with topical treatments. Consider oral medications only if topical treatments are insufficient.'}
+2. ${
+    severity === 'severe' || severity === 'very_severe'
+      ? 'Include oral medications as severity warrants. Consider referral to dermatologist for very severe cases.'
+      : 'Start with topical treatments. Consider oral medications only if topical treatments are insufficient.'
+  }
 3. Provide specific, measurable dosages and frequencies
 4. Include all relevant warnings and contraindications
 5. Make lifestyle recommendations specific and actionable
@@ -159,7 +180,6 @@ Return ONLY valid JSON. Do not include any markdown formatting, code blocks, or 
     const response = await result.response;
     const text = response.text();
 
-    // Parse JSON from response (remove markdown code blocks if present)
     let jsonText = text.trim();
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
@@ -169,22 +189,112 @@ Return ONLY valid JSON. Do not include any markdown formatting, code blocks, or 
 
     const prescriptionData = JSON.parse(jsonText);
 
-    // Validate and structure the response
     return {
-      medications: Array.isArray(prescriptionData.medications) 
-        ? prescriptionData.medications 
+      medications: Array.isArray(prescriptionData.medications)
+        ? prescriptionData.medications
         : [],
-      lifestyleRecommendations: Array.isArray(prescriptionData.lifestyleRecommendations)
+      lifestyleRecommendations: Array.isArray(
+        prescriptionData.lifestyleRecommendations
+      )
         ? prescriptionData.lifestyleRecommendations
         : [],
-      followUpInstructions: prescriptionData.followUpInstructions || 'Follow up as needed.',
-      reasoning: prescriptionData.reasoning || `Prescription generated for ${severity} acne severity.`,
+      followUpInstructions:
+        prescriptionData.followUpInstructions || 'Follow up as needed.',
+      reasoning:
+        prescriptionData.reasoning ||
+        `Prescription generated for ${severity} acne severity.`,
     };
   } catch (error: any) {
     console.error('Gemini API error:', error);
-    
-    // Fallback to basic prescription if API fails
-    throw new Error(`Failed to generate prescription with Gemini: ${error.message}`);
+    throw new Error(
+      `Failed to generate prescription with Gemini: ${error.message}`
+    );
   }
 }
+
+/**
+ * Translate an existing prescription into a target language while preserving structure.
+ */
+export async function translatePrescriptionWithGemini(
+  content: {
+    medications: any[];
+    lifestyleRecommendations: string[];
+    followUpInstructions: string;
+  },
+  targetLanguage: 'hi' | 'te'
+): Promise<{
+  medications: any[];
+  lifestyleRecommendations: string[];
+  followUpInstructions: string;
+}> {
+  if (!genAI) {
+    throw new Error(
+      'Gemini API key is not configured. Please set GEMINI_API_KEY environment variable.'
+    );
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const languageName = targetLanguage === 'hi' ? 'Hindi' : 'Telugu';
+
+  const prompt = `You are a precise medical translator.
+Translate the following acne treatment prescription into ${languageName}.
+
+Requirements:
+- Keep medicine names, strengths (like "0.1%", "2.5%", "100mg") and technical terms accurate.
+- Preserve the JSON structure exactly.
+- Translate all patient-facing text (instructions, recommendations, follow-up) into ${languageName}.
+- Return ONLY valid JSON, no markdown or extra text.
+
+Original prescription JSON:
+${JSON.stringify(content, null, 2)}
+
+Return JSON with this exact structure:
+{
+  "medications": [
+    {
+      "name": "Medication name (generic and brand if applicable)",
+      "type": "topical or oral",
+      "dosage": "Specific dosage",
+      "frequency": "Frequency of use",
+      "duration": "Duration of use",
+      "instructions": "Patient instructions",
+      "warnings": ["Warning 1", "Warning 2"]
+    }
+  ],
+  "lifestyleRecommendations": ["Recommendation 1", "Recommendation 2"],
+  "followUpInstructions": "Follow-up instructions"
+}`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '');
+    }
+
+    const data = JSON.parse(jsonText);
+
+    return {
+      medications: Array.isArray(data.medications)
+        ? data.medications
+        : content.medications,
+      lifestyleRecommendations: Array.isArray(data.lifestyleRecommendations)
+        ? data.lifestyleRecommendations
+        : content.lifestyleRecommendations,
+      followUpInstructions:
+        data.followUpInstructions || content.followUpInstructions,
+    };
+  } catch (error: any) {
+    console.error('Gemini translation error:', error);
+    throw new Error(
+      `Failed to translate prescription with Gemini: ${error.message}`
+    );
+  }
+}
+
 
